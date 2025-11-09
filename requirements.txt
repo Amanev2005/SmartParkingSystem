@@ -1,0 +1,8 @@
+flask
+flask_sqlalchemy
+opencv-python
+ultralytics
+easyocr
+pillow
+numpy
+requests
