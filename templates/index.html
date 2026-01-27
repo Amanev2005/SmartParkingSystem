@@ -6,26 +6,70 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-  <h1>Smart Parking System (YOLOv8 + EasyOCR)</h1>
+  <div class="container">
+    <header>
+      <h1>🅿️ Smart Parking System</h1>
+      <p class="subtitle">YOLOv8 + EasyOCR Powered ANPR</p>
+      <div class="stats">
+        <div class="stat-card">
+          <span class="stat-number" id="availableCount">0</span>
+          <span class="stat-label">Available</span>
+        </div>
+        <div class="stat-card occupied">
+          <span class="stat-number" id="occupiedCount">0</span>
+          <span class="stat-label">Occupied</span>
+        </div>
+        <div class="stat-card total">
+          <span class="stat-number" id="totalCount">0</span>
+          <span class="stat-label">Total Slots</span>
+        </div>
+      </div>
+    </header>
 
-  <section id="controls">
-    <h2>Manual Entry</h2>
-    <form id="entryForm">
-      <input type="text" name="plate" placeholder="Plate (e.g. KA01AB1234)">
-      <button type="submit">Register Entry</button>
-    </form>
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="dashboard">📊 Dashboard</button>
+      <button class="tab-btn" data-tab="details">📋 Vehicle Details</button>
+    </nav>
 
-    <h2>Manual Exit</h2>
-    <form id="exitForm">
-      <input type="text" name="plate" placeholder="Plate (e.g. KA01AB1234)">
-      <button type="submit">Register Exit</button>
-    </form>
-  </section>
+    <!-- Dashboard Tab -->
+    <div id="dashboard" class="tab-content active">
+      <section id="controls">
+        <div class="control-group">
+          <h2>📥 Vehicle Entry</h2>
+          <form id="entryForm">
+            <input type="text" name="plate" placeholder="KA01AB1234" required>
+            <button type="submit">Register Entry</button>
+          </form>
+        </div>
 
-  <section id="slots">
-    <h2>Slots</h2>
-    <div id="slotGrid"></div>
-  </section>
+        <div class="control-group">
+          <h2>📤 Vehicle Exit</h2>
+          <form id="exitForm">
+            <input type="text" name="plate" placeholder="KA01AB1234" required>
+            <button type="submit">Register Exit</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="parking-lot">
+        <h2>🚗 Parking Layout</h2>
+        <div id="parkingLot"></div>
+      </section>
+    </div>
+
+    <!-- Vehicle Details Tab -->
+    <div id="details" class="tab-content">
+      <section id="details-section">
+        <h2>🚗 Vehicle Details & Payment Status</h2>
+        <div class="details-controls">
+          <button id="refreshDetailsBtn" class="refresh-btn">🔄 Refresh</button>
+        </div>
+        <div id="detailsContainer" class="details-table-container">
+          <p style="text-align: center; color: #9ca3af;">Loading vehicle details...</p>
+        </div>
+      </section>
+    </div>
+  </div>
 
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
