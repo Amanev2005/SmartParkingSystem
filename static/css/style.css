@@ -8,7 +8,7 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
-  padding: 20px;
+  padding: 0;
   color: #333;
 }
 
@@ -19,8 +19,9 @@ body {
 
 header {
   text-align: center;
-  margin-bottom: 30px;
+  padding: 30px 20px 20px;
   color: white;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 h1 {
@@ -32,7 +33,74 @@ h1 {
 .subtitle {
   font-size: 1.1em;
   opacity: 0.9;
-  margin-bottom: 20px;
+  margin-bottom: 0;
+}
+
+/* Navigation Bar */
+.main-nav {
+  background: white;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-logo {
+  font-size: 1.3em;
+  font-weight: 700;
+  color: #667eea;
+  padding: 15px 30px;
+}
+
+.nav-links {
+  display: flex;
+  list-style: none;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.nav-link {
+  display: block;
+  padding: 20px 25px;
+  color: #6b7280;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 1em;
+  border-bottom: 4px solid transparent;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  background: #f3f4f6;
+  color: #667eea;
+}
+
+.nav-link.active {
+  color: #667eea;
+  border-bottom-color: #667eea;
+  background: #f9fafb;
+}
+
+/* Page Content */
+.page-content {
+  display: none;
+  padding: 30px 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+.page-content.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .stats {
@@ -40,6 +108,7 @@ h1 {
   gap: 15px;
   justify-content: center;
   flex-wrap: wrap;
+  margin-bottom: 30px;
 }
 
 .stat-card {
@@ -158,12 +227,6 @@ button:active {
   position: relative;
 }
 
-.parking-row {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
 .parking-slot {
   background: linear-gradient(180deg, #4b5563 0%, #374151 100%);
   border: 3px dashed #9ca3af;
@@ -247,61 +310,7 @@ button:active {
   filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
 }
 
-@media (max-width: 768px) {
-  h1 { 
-    font-size: 1.8em; 
-  }
-  
-  #parkingLot { 
-    padding: 20px; 
-    gap: 15px;
-  }
-  
-  .parking-slot { 
-    min-height: 100px;
-    padding: 15px;
-  }
-
-  /* ...existing code... */
-
-.tab-nav {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 30px;
-  background: white;
-  padding: 15px;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-
-.tab-btn {
-  padding: 12px 24px;
-  background: #e5e7eb;
-  border: none;
-  border-radius: 8px;
-  font-size: 1em;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.tab-btn:hover {
-  background: #d1d5db;
-}
-
-.tab-btn.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-}
-
-.tab-content {
-  display: none;
-}
-
-.tab-content.active {
-  display: block;
-}
-
+/* Details Section Styles */
 #details-section {
   background: white;
   padding: 30px;
@@ -433,6 +442,64 @@ button:active {
   transform: scale(0.95);
 }
 
+@media (max-width: 768px) {
+  header {
+    padding: 20px 20px 15px;
+  }
+
+  h1 { 
+    font-size: 1.8em; 
+  }
+  
+  .main-nav {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .nav-logo {
+    padding: 12px 20px;
+  }
+
+  .nav-links {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .nav-link {
+    padding: 15px 20px;
+    border-bottom: 3px solid transparent;
+    border-right: 4px solid transparent;
+  }
+
+  .nav-link.active {
+    border-right-color: #667eea;
+    border-bottom-color: transparent;
+  }
+
+  #parkingLot { 
+    padding: 20px; 
+    gap: 15px;
+  }
+  
+  .parking-slot { 
+    min-height: 100px;
+    padding: 15px;
+  }
+
+  .details-table-container {
+    font-size: 0.9em;
+  }
+  
+  .details-table th,
+  .details-table td {
+    padding: 10px;
+  }
+
+  .page-content {
+    padding: 20px 15px;
+  }
+}
+
 @media (max-width: 1024px) {
   .details-table-container {
     font-size: 0.9em;
@@ -442,16 +509,4 @@ button:active {
   .details-table td {
     padding: 10px;
   }
-}
-
-@media (max-width: 768px) {
-  .tab-nav {
-    flex-wrap: wrap;
-  }
-  
-  .tab-btn {
-    padding: 10px 16px;
-    font-size: 0.9em;
-  }
-}
 }

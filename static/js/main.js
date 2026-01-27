@@ -2,24 +2,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const entryForm = document.getElementById('entryForm');
   const exitForm = document.getElementById('exitForm');
   const parkingLot = document.getElementById('parkingLot');
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const tabContents = document.querySelectorAll('.tab-content');
+  const navLinks = document.querySelectorAll('.nav-link');
+  const pageContents = document.querySelectorAll('.page-content');
 
-  // Tab switching functionality
-  tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tabName = btn.dataset.tab;
+  // Navigation functionality
+  navLinks.forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const pageName = link.dataset.page;
       
-      // Remove active class from all tabs and buttons
-      tabBtns.forEach(b => b.classList.remove('active'));
-      tabContents.forEach(tc => tc.classList.remove('active'));
+      // Remove active class from all links and pages
+      navLinks.forEach(l => l.classList.remove('active'));
+      pageContents.forEach(pc => pc.classList.remove('active'));
       
-      // Add active class to clicked button and corresponding tab
-      btn.classList.add('active');
-      document.getElementById(tabName).classList.add('active');
+      // Add active class to clicked link and corresponding page
+      link.classList.add('active');
+      document.getElementById(`${pageName}-page`).classList.add('active');
       
-      // Load details when details tab is opened
-      if (tabName === 'details') {
+      // Load details when details page is opened
+      if (pageName === 'details') {
         loadVehicleDetails();
       }
     });
@@ -135,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const paymentClass = vehicle.payment_status === 'paid' ? 'payment-paid' : 'payment-pending';
       const paymentText = vehicle.payment_status === 'paid' ? '✓ PAID' : '⏳ PENDING';
       
-      const actionBtn = vehicle.payment_status === 'pending' && vehicle.time_out ? 
+      const actionBtn = vehicle.payment_status === 'pending' && vehicle.time_out !== 'Still Parked' ? 
         `<button class="pay-btn" onclick="processPayment(${vehicle.id}, '${vehicle.plate}', ${vehicle.charge.replace('₹', '')})">💳 Pay Now</button>` : 
         '<span style="color: #10b981;">✓ Completed</span>';
 
@@ -215,13 +216,12 @@ document.addEventListener('DOMContentLoaded', () => {
       exitForm.reset();
       loadSlots();
       showNotification('✓ Vehicle exited: ' + plate + ` (Charge: ${res.charge}₹)`, 'success');
-      loadVehicleDetails();
     } else {
       showNotification('✗ Exit failed: ' + (res.error || 'Unknown error'), 'error');
     }
   });
 
-  // Refresh button for details tab
+  // Refresh button for details page
   const refreshBtn = document.getElementById('refreshDetailsBtn');
   if (refreshBtn) {
     refreshBtn.addEventListener('click', loadVehicleDetails);

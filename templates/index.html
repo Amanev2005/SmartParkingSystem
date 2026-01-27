@@ -10,6 +10,17 @@
     <header>
       <h1>🅿️ Smart Parking System</h1>
       <p class="subtitle">YOLOv8 + EasyOCR Powered ANPR</p>
+    </header>
+
+    <nav class="main-nav">
+      <div class="nav-logo">Smart Parking</div>
+      <ul class="nav-links">
+        <li><a href="/" class="nav-link active" data-page="dashboard">📊 Dashboard</a></li>
+        <li><a href="/details" class="nav-link" data-page="details">📋 Vehicle Details</a></li>
+      </ul>
+    </nav>
+
+    <div id="dashboard-page" class="page-content active">
       <div class="stats">
         <div class="stat-card">
           <span class="stat-number" id="availableCount">0</span>
@@ -24,15 +35,7 @@
           <span class="stat-label">Total Slots</span>
         </div>
       </div>
-    </header>
 
-    <nav class="tab-nav">
-      <button class="tab-btn active" data-tab="dashboard">📊 Dashboard</button>
-      <button class="tab-btn" data-tab="details">📋 Vehicle Details</button>
-    </nav>
-
-    <!-- Dashboard Tab -->
-    <div id="dashboard" class="tab-content active">
       <section id="controls">
         <div class="control-group">
           <h2>📥 Vehicle Entry</h2>
@@ -57,8 +60,7 @@
       </section>
     </div>
 
-    <!-- Vehicle Details Tab -->
-    <div id="details" class="tab-content">
+    <div id="details-page" class="page-content">
       <section id="details-section">
         <h2>🚗 Vehicle Details & Payment Status</h2>
         <div class="details-controls">

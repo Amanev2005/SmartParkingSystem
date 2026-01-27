@@ -34,11 +34,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-RATE_PER_10_MIN = 50.0  # 50 rupees per 10 minutes
-MIN_CHARGE = 50.0  # Minimum charge (10 minutes)
+RATE_PER_MINUTE = 5.0  # 5 rupees per minute
+MIN_CHARGE = 10.0  # Minimum charge
 
 @app.route('/')
 def index():
+    """Serve the main dashboard page"""
     return render_template('index.html')
 
 @app.route('/api/slots', methods=['GET'])
@@ -148,15 +149,14 @@ def exit_vehicle_internal(plate, txn):
         duration_seconds = (txn.time_out - txn.time_in).total_seconds()
         duration_minutes = math.ceil(duration_seconds / 60.0)
         
-        # Calculate charge: 50 rupees per 10 minutes
-        ten_minute_blocks = math.ceil(duration_minutes / 10.0)
-        charge = max(MIN_CHARGE, ten_minute_blocks * RATE_PER_10_MIN)
+        # Calculate charge: 5 rupees per minute with minimum 10 rupees
+        charge = max(MIN_CHARGE, duration_minutes * RATE_PER_MINUTE)
         
         txn.duration_minutes = duration_minutes
         txn.charge = round(charge, 2)
         txn.payment_status = 'pending'  # New vehicle exits with pending payment
         
-        logger.info(f'[EXIT] Duration: {duration_minutes}m ({ten_minute_blocks} blocks × 10min), Charge: ₹{charge}')
+        logger.info(f'[EXIT] Duration: {duration_minutes}m, Charge: ₹{charge}')
         
         # Release slot
         if txn.slot_id:
