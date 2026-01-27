@@ -163,6 +163,8 @@ document.addEventListener('DOMContentLoaded', () => {
     container.innerHTML = html;
   }
 
+// ...existing code...
+
   function processPayment(txnId, plate, amount) {
     if (confirm(`Process payment of ₹${amount.toFixed(2)} for vehicle ${plate}?`)) {
       fetch(`/api/payment/process/${txnId}`, {
@@ -184,6 +186,349 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // NEW: Print receipt function
+  function printReceipt(txnId, plate, slotNumber, entryTime, exitTime, duration, charge) {
+    // Create payment data string for QR code
+    const paymentData = `PARKING|${plate}|${slotNumber}|₹${charge}|${new Date().toISOString()}`;
+    
+    // Open print window
+    const printWindow = window.open('', '_blank', 'width=500,height=700');
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Parking Receipt - ${plate}</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body {
+            font-family: 'Arial', sans-serif;
+            background: white;
+            padding: 20px;
+            color: #333;
+          }
+          
+          .receipt-container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          }
+          
+          .receipt-header {
+            text-align: center;
+            margin-bottom: 25px;
+            border-bottom: 3px dashed #667eea;
+            padding-bottom: 15px;
+          }
+          
+          .receipt-header h1 {
+            font-size: 24px;
+            color: #667eea;
+            margin-bottom: 5px;
+          }
+          
+          .receipt-header p {
+            font-size: 12px;
+            color: #6b7280;
+          }
+          
+          .receipt-body {
+            margin-bottom: 20px;
+          }
+          
+          .receipt-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 14px;
+          }
+          
+          .receipt-label {
+            font-weight: 600;
+            color: #1f2937;
+          }
+          
+          .receipt-value {
+            text-align: right;
+            color: #6b7280;
+            font-family: 'Courier New', monospace;
+          }
+          
+          .receipt-row.highlight {
+            background: #f3f4f6;
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+          }
+          
+          .receipt-row.highlight .receipt-label {
+            color: #667eea;
+            font-size: 16px;
+          }
+          
+          .receipt-row.highlight .receipt-value {
+            color: #667eea;
+            font-size: 20px;
+            font-weight: bold;
+          }
+          
+          .divider {
+            border-top: 2px dashed #e5e7eb;
+            margin: 15px 0;
+          }
+          
+          .qr-section {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+          }
+          
+          .qr-section h3 {
+            font-size: 14px;
+            color: #1f2937;
+            margin-bottom: 15px;
+          }
+          
+          #qrcode {
+            display: inline-block;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+          }
+          
+          .receipt-footer {
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+            border-top: 2px dashed #e5e7eb;
+            padding-top: 15px;
+            margin-top: 15px;
+          }
+          
+          .receipt-footer p {
+            margin-bottom: 8px;
+          }
+          
+          .thank-you {
+            font-size: 14px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+          }
+          
+          @media print {
+            body {
+              padding: 0;
+            }
+            
+            .receipt-container {
+              box-shadow: none;
+              border: 1px solid #ccc;
+            }
+            
+            button {
+              display: none;
+            }
+          }
+          
+          .print-button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+          }
+          
+          .print-button:hover {
+            transform: translateY(-2px);
+          }
+          
+          .close-button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            background: #e5e7eb;
+            color: #1f2937;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+          }
+          
+          .close-button:hover {
+            background: #d1d5db;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="receipt-container">
+          <div class="receipt-header">
+            <h1>🅿️ PARKING RECEIPT</h1>
+            <p>Smart Parking System</p>
+          </div>
+          
+          <div class="receipt-body">
+            <div class="receipt-row">
+              <span class="receipt-label">License Plate:</span>
+              <span class="receipt-value">${plate}</span>
+            </div>
+            
+            <div class="receipt-row">
+              <span class="receipt-label">Slot Number:</span>
+              <span class="receipt-value">${slotNumber}</span>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="receipt-row">
+              <span class="receipt-label">Entry Time:</span>
+              <span class="receipt-value">${entryTime}</span>
+            </div>
+            
+            <div class="receipt-row">
+              <span class="receipt-label">Exit Time:</span>
+              <span class="receipt-value">${exitTime}</span>
+            </div>
+            
+            <div class="receipt-row">
+              <span class="receipt-label">Duration:</span>
+              <span class="receipt-value">${duration} min</span>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="receipt-row highlight">
+              <span class="receipt-label">AMOUNT DUE:</span>
+              <span class="receipt-value">₹${charge}</span>
+            </div>
+          </div>
+          
+          <div class="qr-section">
+            <h3>📱 Scan to Pay</h3>
+            <div id="qrcode"></div>
+            <p style="margin-top: 10px; font-size: 12px; color: #6b7280;">
+              5 Rupees per minute<br>
+              Minimum: ₹10
+            </p>
+          </div>
+          
+          <div class="receipt-footer">
+            <p class="thank-you">Thank You!</p>
+            <p>For Smart Parking System</p>
+            <p style="margin-top: 10px; font-size: 11px;">
+              Receipt ID: ${txnId}<br>
+              Generated: ${new Date().toLocaleString()}
+            </p>
+          </div>
+          
+          <button class="print-button" onclick="window.print()">🖨️ Print Receipt</button>
+          <button class="close-button" onclick="window.close()">Close</button>
+        </div>
+        
+        <script>
+          // Generate QR code
+          new QRCode(document.getElementById('qrcode'), {
+            text: '${paymentData}',
+            width: 200,
+            height: 200,
+            colorDark: '#667eea',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.H
+          });
+        </script>
+      </body>
+      </html>
+    `;
+    
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  }
+
+  // Expose printReceipt to global scope
+  window.printReceipt = printReceipt;
+
+  // ...existing code in renderVehicleDetails...
+  function renderVehicleDetails(vehicles) {
+    const container = document.getElementById('detailsContainer');
+    
+    if (!Array.isArray(vehicles) || vehicles.length === 0) {
+      container.innerHTML = '<p style="color: #9ca3af; text-align: center;">No vehicle records found</p>';
+      return;
+    }
+
+    let html = `
+      <table class="details-table">
+        <thead>
+          <tr>
+            <th>Slot No.</th>
+            <th>License Plate</th>
+            <th>Entry Time</th>
+            <th>Exit Time</th>
+            <th>Duration (min)</th>
+            <th>Charge</th>
+            <th>Status</th>
+            <th>Payment</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    vehicles.forEach(vehicle => {
+      const statusClass = vehicle.status === 'PARKED' ? 'status-parked' : 'status-exited';
+      const paymentClass = vehicle.payment_status === 'paid' ? 'payment-paid' : 'payment-pending';
+      const paymentText = vehicle.payment_status === 'paid' ? '✓ PAID' : '⏳ PENDING';
+      
+      // CHANGED: Print button instead of Pay Now
+      const actionBtn = vehicle.payment_status === 'pending' && vehicle.time_out !== 'Still Parked' ? 
+        `<button class="print-btn" onclick="printReceipt(${vehicle.id}, '${vehicle.plate}', '${vehicle.slot_number}', '${vehicle.time_in}', '${vehicle.time_out}', ${vehicle.duration_minutes}, '${vehicle.charge.replace('₹', '')}')">🖨️ Print</button>` : 
+        '<span style="color: #10b981;">✓ Paid</span>';
+
+      html += `
+        <tr>
+          <td><strong>${vehicle.slot_number}</strong></td>
+          <td><span class="plate-badge">${vehicle.plate}</span></td>
+          <td>${vehicle.time_in}</td>
+          <td>${vehicle.time_out}</td>
+          <td>${vehicle.duration_minutes}</td>
+          <td><strong>${vehicle.charge}</strong></td>
+          <td><span class="status-badge ${statusClass}">${vehicle.status}</span></td>
+          <td><span class="payment-badge ${paymentClass}">${paymentText}</span></td>
+          <td>${actionBtn}</td>
+        </tr>
+      `;
+    });
+
+    html += `
+        </tbody>
+      </table>
+    `;
+
+    container.innerHTML = html;
+  }
+
+  // ...rest of existing code...
   // Expose processPayment to global scope for onclick handlers
   window.processPayment = processPayment;
 

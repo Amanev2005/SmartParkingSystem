@@ -510,3 +510,49 @@ button:active {
     padding: 10px;
   }
 }
+/* ...existing code... */
+
+.pay-btn {
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.pay-btn:hover {
+  background: #2563eb;
+  transform: scale(1.05);
+}
+
+.pay-btn:active {
+  transform: scale(0.95);
+}
+
+/* NEW: Print button styling */
+.print-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 14px;
+}
+
+.print-btn:hover {
+  background: linear-gradient(135deg, #5568d3 0%, #6b3d91 100%);
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.print-btn:active {
+  transform: scale(0.95);
+}
+
+/* ...rest of existing CSS... */

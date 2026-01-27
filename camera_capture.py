@@ -39,7 +39,7 @@ def string_similarity(a: str, b: str) -> float:
     """Calculate similarity between two strings (0-1)"""
     return SequenceMatcher(None, a, b).ratio()
 
-def _open_capture(source="http://10.85.107.37:8080/video"):
+def _open_capture(source="http://10.16.120.123:8080/video"):
     """
     Try multiple backends depending on source type.
     """
@@ -270,4 +270,4 @@ def main_loop(source=0, show_window=True):
 
 if __name__ == '__main__':
     # Use IP camera stream URL
-    main_loop(source="http://10.85.107.37:8080/video", show_window=True)
+    main_loop(source="http://10.16.120.123:8080/video", show_window=True)
