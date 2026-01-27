@@ -1,6 +1,7 @@
 from flask import jsonify, request, render_template
 from models import create_app, db, Slot, Transaction
 from datetime import datetime
+from qr_payment import generate_qr
 import math
 
 app = create_app()
@@ -39,6 +40,7 @@ def vehicle_entry():
     slot.current_txn_id = txn.id
     db.session.commit()
     return jsonify({'success': True, 'plate': plate, 'slot': slot.number, 'time_in': txn.time_in.isoformat()})
+    qr_path = generate_qr(txn.charge, txn.id)
 
 @app.route('/api/exit', methods=['POST'])
 def vehicle_exit():

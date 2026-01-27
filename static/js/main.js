@@ -104,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('detailsContainer').innerHTML = `<p style="color: #ef4444; text-align: center;">Error loading details: ${err}</p>`;
       });
   }
+// ...existing code...
 
   function renderVehicleDetails(vehicles) {
     const container = document.getElementById('detailsContainer');
@@ -125,7 +126,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <th>Charge</th>
             <th>Status</th>
             <th>Payment</th>
-            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -133,12 +133,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     vehicles.forEach(vehicle => {
       const statusClass = vehicle.status === 'PARKED' ? 'status-parked' : 'status-exited';
-      const paymentClass = vehicle.payment_status === 'paid' ? 'payment-paid' : 'payment-pending';
-      const paymentText = vehicle.payment_status === 'paid' ? '✓ PAID' : '⏳ PENDING';
       
-      const actionBtn = vehicle.payment_status === 'pending' && vehicle.time_out !== 'Still Parked' ? 
-        `<button class="pay-btn" onclick="processPayment(${vehicle.id}, '${vehicle.plate}', ${vehicle.charge.replace('₹', '')})">💳 Pay Now</button>` : 
-        '<span style="color: #10b981;">✓ Completed</span>';
+      // CHANGED: Payment column now shows Print button for pending or PAID badge for completed
+      let paymentCell = '';
+      
+      if (vehicle.payment_status === 'paid') {
+        // Already paid - show green PAID badge
+        paymentCell = '<span class="payment-badge payment-paid">✓ PAID</span>';
+      } else if (vehicle.payment_status === 'pending' && vehicle.time_out !== 'Still Parked') {
+        // Pending payment and vehicle has exited - show Print button
+        paymentCell = `<button class="print-btn" onclick="printPaymentSlip(${vehicle.id}, '${vehicle.plate}', '${vehicle.slot_number}', '${vehicle.time_in}', '${vehicle.time_out}', ${vehicle.duration_minutes}, '${vehicle.charge.replace('₹', '')}')">🖨️ Print</button>`;
+      } else if (vehicle.payment_status === 'pending') {
+        // Pending but vehicle still parked
+        paymentCell = '<span class="payment-badge payment-pending">⏳ PENDING</span>';
+      } else {
+        // Failed or other status
+        paymentCell = '<span class="payment-badge" style="background: #fca5a5; color: #7f1d1d;">✗ FAILED</span>';
+      }
 
       html += `
         <tr>
@@ -149,8 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>${vehicle.duration_minutes}</td>
           <td><strong>${vehicle.charge}</strong></td>
           <td><span class="status-badge ${statusClass}">${vehicle.status}</span></td>
-          <td><span class="payment-badge ${paymentClass}">${paymentText}</span></td>
-          <td>${actionBtn}</td>
+          <td>${paymentCell}</td>
         </tr>
       `;
     });
@@ -163,7 +173,310 @@ document.addEventListener('DOMContentLoaded', () => {
     container.innerHTML = html;
   }
 
-// ...existing code...
+  // NEW: Print Payment Slip with QR Code
+  function printPaymentSlip(txnId, plate, slotNumber, entryTime, exitTime, duration, charge) {
+    // Create UPI payment string
+    const upiString = `upi://pay?pa=smartparking@upi&pn=SmartParking&am=${charge}&cu=INR&tr=TXN${txnId}`;
+    
+    // Generate QR code using free API
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiString)}`;
+    
+    // Open print window
+    const printWindow = window.open('', '_blank', 'width=500,height=750');
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Payment Slip - ${plate}</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body {
+            font-family: 'Arial', sans-serif;
+            background: white;
+            padding: 15px;
+            color: #333;
+          }
+          
+          .slip-container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          }
+          
+          .slip-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 3px dashed #667eea;
+          }
+          
+          .slip-header h1 {
+            font-size: 28px;
+            color: #667eea;
+            margin-bottom: 5px;
+          }
+          
+          .slip-header p {
+            font-size: 11px;
+            color: #6b7280;
+          }
+          
+          .slip-body {
+            margin-bottom: 20px;
+          }
+          
+          .slip-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 13px;
+            padding: 8px 0;
+          }
+          
+          .slip-label {
+            font-weight: 700;
+            color: #1f2937;
+          }
+          
+          .slip-value {
+            text-align: right;
+            color: #4b5563;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+          }
+          
+          .slip-divider {
+            border-top: 2px dashed #e5e7eb;
+            margin: 12px 0;
+          }
+          
+          .slip-row.highlight {
+            background: #f0f4ff;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+            font-size: 14px;
+          }
+          
+          .slip-row.highlight .slip-label {
+            color: #667eea;
+            font-size: 15px;
+          }
+          
+          .slip-row.highlight .slip-value {
+            color: #667eea;
+            font-size: 18px;
+          }
+          
+          .qr-section {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+          }
+          
+          .qr-section h3 {
+            font-size: 13px;
+            color: #1f2937;
+            margin-bottom: 12px;
+            font-weight: 700;
+          }
+          
+          .qr-section img {
+            max-width: 200px;
+            height: auto;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            padding: 5px;
+            background: white;
+          }
+          
+          .qr-info {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 10px;
+          }
+          
+          .slip-footer {
+            text-align: center;
+            font-size: 11px;
+            color: #6b7280;
+            border-top: 2px dashed #e5e7eb;
+            padding-top: 12px;
+            margin-top: 12px;
+          }
+          
+          .slip-footer p {
+            margin-bottom: 6px;
+          }
+          
+          .thank-you {
+            font-size: 13px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 8px;
+          }
+          
+          .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+          }
+          
+          .action-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+          }
+          
+          .print-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+          }
+          
+          .print-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+          }
+          
+          .close-btn {
+            background: #e5e7eb;
+            color: #1f2937;
+          }
+          
+          .close-btn:hover {
+            background: #d1d5db;
+          }
+          
+          @media print {
+            body {
+              padding: 0;
+            }
+            
+            .slip-container {
+              box-shadow: none;
+              border: 1px solid #ccc;
+            }
+            
+            .action-buttons {
+              display: none;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="slip-container">
+          <div class="slip-header">
+            <h1>🅿️ SMART PARKING</h1>
+            <p>Payment Receipt & Invoice</p>
+          </div>
+          
+          <div class="slip-body">
+            <!-- Vehicle Information -->
+            <div class="slip-row">
+              <span class="slip-label">License Plate:</span>
+              <span class="slip-value">${plate}</span>
+            </div>
+            
+            <div class="slip-row">
+              <span class="slip-label">Parking Slot:</span>
+              <span class="slip-value">P${String(slotNumber).padStart(2, '0')}</span>
+            </div>
+            
+            <div class="slip-divider"></div>
+            
+            <!-- Parking Duration -->
+            <div class="slip-row">
+              <span class="slip-label">Entry Time:</span>
+              <span class="slip-value">${entryTime}</span>
+            </div>
+            
+            <div class="slip-row">
+              <span class="slip-label">Exit Time:</span>
+              <span class="slip-value">${exitTime}</span>
+            </div>
+            
+            <div class="slip-row">
+              <span class="slip-label">Duration:</span>
+              <span class="slip-value">${duration} min</span>
+            </div>
+            
+            <div class="slip-divider"></div>
+            
+            <!-- Pricing Details -->
+            <div class="slip-row">
+              <span class="slip-label">Rate:</span>
+              <span class="slip-value">₹5/min</span>
+            </div>
+            
+            <div class="slip-row">
+              <span class="slip-label">Calculation:</span>
+              <span class="slip-value">${duration} × ₹5</span>
+            </div>
+            
+            <div class="slip-row highlight">
+              <span class="slip-label">AMOUNT DUE:</span>
+              <span class="slip-value">₹${charge}</span>
+            </div>
+          </div>
+          
+          <!-- QR Code Section -->
+          <div class="qr-section">
+            <h3>📱 Scan to Pay</h3>
+            <img src="${qrCodeUrl}" alt="UPI QR Code">
+            <div class="qr-info">
+              ✓ Supports Google Pay, PhonePe, Paytm, BHIM<br>
+              ✓ Instant payment confirmation
+            </div>
+          </div>
+          
+          <!-- Footer -->
+          <div class="slip-footer">
+            <p class="thank-you">Thank You! 🙏</p>
+            <p>For using Smart Parking System</p>
+            <p style="margin-top: 8px; font-size: 10px;">
+              Transaction ID: TXN${txnId}<br>
+              Generated: ${new Date().toLocaleString()}<br>
+              Valid for 24 hours
+            </p>
+          </div>
+          
+          <!-- Action Buttons -->
+          <div class="action-buttons">
+            <button class="action-btn print-btn" onclick="window.print()">🖨️ Print Slip</button>
+            <button class="action-btn close-btn" onclick="window.close()">✕ Close</button>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  }
+
+  // Expose function to global scope
+  window.printPaymentSlip = printPaymentSlip;
+
+  // ...rest of existing code...
 
   function processPayment(txnId, plate, amount) {
     if (confirm(`Process payment of ₹${amount.toFixed(2)} for vehicle ${plate}?`)) {
@@ -500,10 +813,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const paymentClass = vehicle.payment_status === 'paid' ? 'payment-paid' : 'payment-pending';
       const paymentText = vehicle.payment_status === 'paid' ? '✓ PAID' : '⏳ PENDING';
       
-      // CHANGED: Print button instead of Pay Now
-      const actionBtn = vehicle.payment_status === 'pending' && vehicle.time_out !== 'Still Parked' ? 
-        `<button class="print-btn" onclick="printReceipt(${vehicle.id}, '${vehicle.plate}', '${vehicle.slot_number}', '${vehicle.time_in}', '${vehicle.time_out}', ${vehicle.duration_minutes}, '${vehicle.charge.replace('₹', '')}')">🖨️ Print</button>` : 
-        '<span style="color: #10b981;">✓ Paid</span>';
+      
+// CHANGED: Print button instead of Pay Now
+const actionBtn = vehicle.payment_status === 'pending' && vehicle.time_out !== 'Still Parked' ? 
+  `<button class="print-btn" onclick="printPaymentSlip(${vehicle.id}, '${vehicle.plate}', '${vehicle.slot_number}', '${vehicle.time_in}', '${vehicle.time_out}', ${vehicle.duration_minutes}, '${vehicle.charge.replace('₹', '')}')">🖨️ Print</button>` : 
+  '<span style="color: #10b981;">Still Parked</span>';
 
       html += `
         <tr>
