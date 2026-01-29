@@ -16,12 +16,12 @@ API_HEALTH = 'http://localhost:5000/api/health'
 # Store detected plates with timestamps for confidence voting
 plate_detections = {}  # plate -> [timestamps]
 DUPLICATE_IGNORE_SECONDS = 25  # Ignore same plate within 25 seconds
-REQUIRED_DETECTIONS = 3  # Require 3 confirmations (increased for accuracy)
-DETECTION_TIME_WINDOW = 6  # Within 6 seconds
+REQUIRED_DETECTIONS = 2 # Require 3 confirmations (increased for accuracy)
+DETECTION_TIME_WINDOW = 4  # Within 6 seconds
 SIMILARITY_THRESHOLD = 0.85  # 85% string similarity to consider as same plate
 
 FRAME_QUEUE_MAX = 2
-PROCESS_EVERY_N = 3
+PROCESS_EVERY_N = 2
 DISPLAY_UPDATE_EVERY = 3
 
 def check_api_health():
@@ -39,7 +39,7 @@ def string_similarity(a: str, b: str) -> float:
     """Calculate similarity between two strings (0-1)"""
     return SequenceMatcher(None, a, b).ratio()
 
-def _open_capture(source="http://10.16.120.123:8080/video"):
+def _open_capture(source="http://10.85.107.37:8080/video"):
     """
     Try multiple backends depending on source type.
     """
@@ -270,4 +270,4 @@ def main_loop(source=0, show_window=True):
 
 if __name__ == '__main__':
     # Use IP camera stream URL
-    main_loop(source="http://10.16.120.123:8080/video", show_window=True)
+    main_loop(source="http://10.85.107.37:8080/video", show_window=True)

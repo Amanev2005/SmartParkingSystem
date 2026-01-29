@@ -1,41 +1,18 @@
 from flask import Flask, render_template, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
+from models import db, Slot, Transaction, create_app
 from datetime import datetime
 import logging
 import math
 
-# Initialize Flask app and database
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///parking.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db = SQLAlchemy(app)
-
-# Define models
-class Slot(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    number = db.Column(db.Integer, unique=True, nullable=False)
-    status = db.Column(db.String(20), nullable=False, default='free')  # free/occupied
-    current_txn_id = db.Column(db.Integer, db.ForeignKey('transaction.id'), nullable=True)
-
-class Transaction(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    plate = db.Column(db.String(128), nullable=False, index=True)
-    slot_id = db.Column(db.Integer, db.ForeignKey('slot.id'), nullable=True)
-    time_in = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    time_out = db.Column(db.DateTime, nullable=True)
-    duration_minutes = db.Column(db.Integer, nullable=True)
-    charge = db.Column(db.Float, nullable=True)
-    payment_status = db.Column(db.String(20), nullable=False, default='pending')  # pending/paid/failed
-    
-    slot = db.relationship('Slot', foreign_keys=[slot_id], backref='transactions')
+# Use the app factory from models.py
+app = create_app()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-RATE_PER_MINUTE = 5.0  # 5 rupees per minute
-MIN_CHARGE = 10.0  # Minimum charge
+RATE_PER_MINUTE = 5.0
+MIN_CHARGE = 10.0
 
 @app.route('/')
 def index():
@@ -57,54 +34,59 @@ def get_slots():
             }
             if slot.current_txn_id:
                 txn = Transaction.query.get(slot.current_txn_id)
-                if txn:
+                if txn and txn.time_out is None:
                     slot_data['plate'] = txn.plate
             result.append(slot_data)
+        logger.info(f'[SLOTS] Returned {len(result)} slots')
         return jsonify(result)
     except Exception as e:
         logger.error(f'Get slots error: {e}')
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/detect', methods=['POST'])
-def detect_plate():
-    """
-    Universal endpoint for plate detection.
-    Logic:
-    1. Check if plate exists in database with time_out=None (active transaction)
-    2. If EXISTS -> Process as EXIT (release slot)
-    3. If NOT EXISTS -> Process as ENTRY (allocate slot)
-    """
-    plate = request.form.get('plate', '').strip().upper()
-    
-    if not plate:
-        return jsonify({'success': False, 'error': 'Plate number required'})
-    
-    logger.info(f'[DETECT] Plate detected: {plate}')
-    
+@app.route('/api/debug/slots', methods=['GET'])
+def debug_slots():
+    """Debug endpoint to check all slots and transactions"""
     try:
-        # Check if vehicle already has active transaction (parked inside)
-        existing_txn = Transaction.query.filter_by(plate=plate, time_out=None).first()
+        slots = Slot.query.all()
+        txns = Transaction.query.all()
         
-        if existing_txn:
-            # VEHICLE ALREADY INSIDE -> PROCESS AS EXIT
-            logger.info(f'[DETECT] Plate {plate} FOUND in database with active transaction. Processing as EXIT.')
-            return exit_vehicle_internal(plate, existing_txn)
-        else:
-            # VEHICLE NOT IN DATABASE OR ALREADY EXITED -> PROCESS AS ENTRY
-            logger.info(f'[DETECT] Plate {plate} NOT found in database. Processing as ENTRY.')
-            return entry_vehicle_internal(plate)
-            
+        slots_info = []
+        for slot in slots:
+            slots_info.append({
+                'id': slot.id,
+                'number': slot.number,
+                'status': slot.status,
+                'current_txn_id': slot.current_txn_id,
+                'txn_plate': Transaction.query.get(slot.current_txn_id).plate if slot.current_txn_id else None
+            })
+        
+        txns_info = []
+        for txn in txns:
+            txns_info.append({
+                'id': txn.id,
+                'plate': txn.plate,
+                'slot_id': txn.slot_id,
+                'time_in': str(txn.time_in),
+                'time_out': str(txn.time_out) if txn.time_out else None,
+                'payment_status': txn.payment_status
+            })
+        
+        return jsonify({
+            'slots': slots_info,
+            'transactions': txns_info,
+            'total_slots': len(slots),
+            'occupied': len([s for s in slots if s.status == 'occupied']),
+            'free': len([s for s in slots if s.status == 'free'])
+        })
     except Exception as e:
-        db.session.rollback()
-        logger.error(f'[DETECT] Error: {e}')
-        return jsonify({'success': False, 'error': str(e)})
+        logger.error(f'Debug error: {e}')
+        return jsonify({'error': str(e)})
 
 def entry_vehicle_internal(plate):
     """Internal function to register vehicle entry"""
     try:
         logger.info(f'[ENTRY] Starting entry process for plate: {plate}')
         
-        # Find available slot
         available_slot = Slot.query.filter_by(status='free').first()
         if not available_slot:
             logger.warning(f'[ENTRY] No available slots for plate: {plate}')
@@ -112,14 +94,12 @@ def entry_vehicle_internal(plate):
         
         logger.info(f'[ENTRY] Found available slot: {available_slot.number}')
         
-        # Create transaction
         txn = Transaction(plate=plate, slot_id=available_slot.id, time_in=datetime.utcnow())
         db.session.add(txn)
         db.session.flush()
         
         logger.info(f'[ENTRY] Transaction created with ID: {txn.id}')
         
-        # Update slot
         available_slot.status = 'occupied'
         available_slot.current_txn_id = txn.id
         db.session.commit()
@@ -136,7 +116,7 @@ def entry_vehicle_internal(plate):
         })
     except Exception as e:
         db.session.rollback()
-        logger.error(f'[ENTRY] ✗ Error for plate {plate}: {e}')
+        logger.error(f'[ENTRY] ✗ Error for plate {plate}: {e}', exc_info=True)
         return jsonify({'success': False, 'error': str(e), 'action': 'entry'})
 
 def exit_vehicle_internal(plate, txn):
@@ -144,21 +124,18 @@ def exit_vehicle_internal(plate, txn):
     try:
         logger.info(f'[EXIT] Starting exit process for plate: {plate}')
         
-        # Update transaction
         txn.time_out = datetime.utcnow()
         duration_seconds = (txn.time_out - txn.time_in).total_seconds()
         duration_minutes = math.ceil(duration_seconds / 60.0)
         
-        # Calculate charge: 5 rupees per minute with minimum 10 rupees
         charge = max(MIN_CHARGE, duration_minutes * RATE_PER_MINUTE)
         
         txn.duration_minutes = duration_minutes
         txn.charge = round(charge, 2)
-        txn.payment_status = 'pending'  # New vehicle exits with pending payment
+        txn.payment_status = 'pending'
         
         logger.info(f'[EXIT] Duration: {duration_minutes}m, Charge: ₹{charge}')
         
-        # Release slot
         if txn.slot_id:
             slot = Slot.query.get(txn.slot_id)
             if slot:
@@ -168,7 +145,7 @@ def exit_vehicle_internal(plate, txn):
         
         db.session.commit()
         
-        logger.info(f'[EXIT] ✓ SUCCESS: Plate {plate} EXITED from Slot {txn.slot.number if txn.slot else "N/A"}, Charge: ₹{charge}')
+        logger.info(f'[EXIT] ✓ SUCCESS: Plate {plate} EXITED, Charge: ₹{charge}')
         
         return jsonify({
             'success': True,
@@ -181,12 +158,37 @@ def exit_vehicle_internal(plate, txn):
         })
     except Exception as e:
         db.session.rollback()
-        logger.error(f'[EXIT] ✗ Error for plate {plate}: {e}')
+        logger.error(f'[EXIT] ✗ Error for plate {plate}: {e}', exc_info=True)
         return jsonify({'success': False, 'error': str(e), 'action': 'exit'})
+
+@app.route('/api/detect', methods=['POST'])
+def detect_plate():
+    """Universal endpoint for plate detection"""
+    plate = request.form.get('plate', '').strip().upper()
+    
+    if not plate:
+        return jsonify({'success': False, 'error': 'Plate number required'})
+    
+    logger.info(f'[DETECT] Plate detected: {plate}')
+    
+    try:
+        existing_txn = Transaction.query.filter_by(plate=plate, time_out=None).first()
+        
+        if existing_txn:
+            logger.info(f'[DETECT] Plate {plate} FOUND. Processing as EXIT.')
+            return exit_vehicle_internal(plate, existing_txn)
+        else:
+            logger.info(f'[DETECT] Plate {plate} NOT found. Processing as ENTRY.')
+            return entry_vehicle_internal(plate)
+            
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'[DETECT] Error: {e}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/entry', methods=['POST'])
 def manual_entry():
-    """Manual entry endpoint - called from admin panel form"""
+    """Manual entry endpoint"""
     plate = request.form.get('plate', '').strip().upper()
     
     if not plate:
@@ -195,7 +197,6 @@ def manual_entry():
     logger.info(f'[MANUAL ENTRY] Plate: {plate}')
     
     try:
-        # Check if vehicle already has active transaction
         existing_txn = Transaction.query.filter_by(plate=plate, time_out=None).first()
         if existing_txn:
             return jsonify({
@@ -207,12 +208,12 @@ def manual_entry():
         return entry_vehicle_internal(plate)
     except Exception as e:
         db.session.rollback()
-        logger.error(f'[MANUAL ENTRY] Error: {e}')
+        logger.error(f'[MANUAL ENTRY] Error: {e}', exc_info=True)
         return jsonify({'success': False, 'error': str(e), 'action': 'entry'})
 
 @app.route('/api/exit', methods=['POST'])
 def manual_exit():
-    """Manual exit endpoint - called from admin panel form"""
+    """Manual exit endpoint"""
     plate = request.form.get('plate', '').strip().upper()
     
     if not plate:
@@ -221,7 +222,6 @@ def manual_exit():
     logger.info(f'[MANUAL EXIT] Plate: {plate}')
     
     try:
-        # Find active transaction for this plate
         txn = Transaction.query.filter_by(plate=plate, time_out=None).first()
         if not txn:
             return jsonify({
@@ -233,12 +233,12 @@ def manual_exit():
         return exit_vehicle_internal(plate, txn)
     except Exception as e:
         db.session.rollback()
-        logger.error(f'[MANUAL EXIT] Error: {e}')
+        logger.error(f'[MANUAL EXIT] Error: {e}', exc_info=True)
         return jsonify({'success': False, 'error': str(e), 'action': 'exit'})
 
 @app.route('/api/transactions', methods=['GET'])
 def get_transactions():
-    """Get all transactions (for history/reporting)"""
+    """Get all transactions"""
     try:
         txns = Transaction.query.order_by(Transaction.time_in.desc()).all()
         result = []
@@ -256,14 +256,13 @@ def get_transactions():
             })
         return jsonify(result)
     except Exception as e:
-        logger.error(f'Transactions error: {e}')
+        logger.error(f'Transactions error: {e}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/vehicle-details', methods=['GET'])
 def get_vehicle_details():
-    """Get detailed vehicle information for admin panel"""
+    """Get detailed vehicle information"""
     try:
-        # Get all transactions with details
         txns = Transaction.query.order_by(Transaction.time_in.desc()).all()
         result = []
         
@@ -283,12 +282,12 @@ def get_vehicle_details():
         
         return jsonify(result)
     except Exception as e:
-        logger.error(f'Vehicle details error: {e}')
+        logger.error(f'Vehicle details error: {e}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/payment/status/<int:txn_id>', methods=['GET'])
 def get_payment_status(txn_id):
-    """Get payment status for a specific transaction"""
+    """Get payment status"""
     try:
         txn = Transaction.query.get(txn_id)
         if not txn:
@@ -302,7 +301,7 @@ def get_payment_status(txn_id):
             'payment_status': txn.payment_status
         })
     except Exception as e:
-        logger.error(f'Payment status error: {e}')
+        logger.error(f'Payment status error: {e}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/payment/process/<int:txn_id>', methods=['POST'])
@@ -313,7 +312,6 @@ def process_payment(txn_id):
         if not txn:
             return jsonify({'success': False, 'error': 'Transaction not found'}), 404
         
-        # Update payment status
         txn.payment_status = 'paid'
         db.session.commit()
         
@@ -326,7 +324,7 @@ def process_payment(txn_id):
         })
     except Exception as e:
         db.session.rollback()
-        logger.error(f'Payment processing error: {e}')
+        logger.error(f'[PAYMENT] Payment processing error: {e}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/health', methods=['GET'])
@@ -339,18 +337,27 @@ def health():
         return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Create tables if they don't exist
     with app.app_context():
         db.create_all()
         
-        # Check if slots exist, if not create them
         slot_count = Slot.query.count()
+        logger.info(f'[DB] Current slot count: {slot_count}')
+        
         if slot_count == 0:
-            logger.info('Creating 60 parking slots...')
-            slots = [Slot(number=i+1, status='free') for i in range(60)]
-            db.session.add_all(slots)
-            db.session.commit()
-            logger.info('60 slots created successfully')
+            logger.info('[DB] Creating 60 parking slots...')
+            try:
+                slots = [Slot(number=i+1, status='free') for i in range(60)]
+                db.session.add_all(slots)
+                db.session.commit()
+                logger.info('[DB] ✓ 60 slots created successfully')
+                
+                verify_count = Slot.query.count()
+                logger.info(f'[DB] Verification: {verify_count} slots in database')
+            except Exception as e:
+                logger.error(f'[DB] ✗ Error creating slots: {e}', exc_info=True)
+                db.session.rollback()
+        else:
+            logger.info(f'[DB] ✓ Database already has {slot_count} slots')
     
     logger.info('Starting Flask server on http://localhost:5000')
     app.run(debug=True, host='localhost', port=5000)
