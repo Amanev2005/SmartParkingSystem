@@ -3,6 +3,8 @@ from models import db, Slot, Transaction, create_app
 from datetime import datetime
 import logging
 import math
+import threading
+import os
 
 # Use the app factory from models.py
 app = create_app()
@@ -90,7 +92,7 @@ def entry_vehicle_internal(plate):
         available_slot = Slot.query.filter_by(status='free').first()
         if not available_slot:
             logger.warning(f'[ENTRY] No available slots for plate: {plate}')
-            return jsonify({'success': False, 'error': 'No available slots', 'action': 'entry'})
+            return {'success': False, 'error': 'No available slots', 'action': 'entry'}
         
         logger.info(f'[ENTRY] Found available slot: {available_slot.number}')
         
@@ -106,18 +108,18 @@ def entry_vehicle_internal(plate):
         
         logger.info(f'[ENTRY] ✓ SUCCESS: Plate {plate} -> Slot {available_slot.number}')
         
-        return jsonify({
+        return {
             'success': True,
             'action': 'entry',
             'message': f'Vehicle {plate} ENTERED. Slot {available_slot.number} assigned.',
             'slot_id': available_slot.id,
             'slot_number': available_slot.number,
             'txn_id': txn.id
-        })
+        }
     except Exception as e:
         db.session.rollback()
         logger.error(f'[ENTRY] ✗ Error for plate {plate}: {e}', exc_info=True)
-        return jsonify({'success': False, 'error': str(e), 'action': 'entry'})
+        return {'success': False, 'error': str(e), 'action': 'entry'}
 
 def exit_vehicle_internal(plate, txn):
     """Internal function to register vehicle exit"""
@@ -147,7 +149,7 @@ def exit_vehicle_internal(plate, txn):
         
         logger.info(f'[EXIT] ✓ SUCCESS: Plate {plate} EXITED, Charge: ₹{charge}')
         
-        return jsonify({
+        return {
             'success': True,
             'action': 'exit',
             'message': f'Vehicle {plate} EXITED from Slot {txn.slot.number if txn.slot else "N/A"}',
@@ -155,36 +157,98 @@ def exit_vehicle_internal(plate, txn):
             'charge': txn.charge,
             'payment_status': 'pending',
             'slot_number': txn.slot.number if txn.slot else None
-        })
+        }
     except Exception as e:
         db.session.rollback()
         logger.error(f'[EXIT] ✗ Error for plate {plate}: {e}', exc_info=True)
-        return jsonify({'success': False, 'error': str(e), 'action': 'exit'})
+        return {'success': False, 'error': str(e), 'action': 'exit'}
+
+@app.route('/api/health', methods=['GET'])
+def health():
+    """Health check endpoint"""
+    try:
+        slot_count = Slot.query.count()
+        occupied_slots = Slot.query.filter_by(status='occupied').count()
+        active_txns = Transaction.query.filter_by(time_out=None).count()
+        
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'database': {
+                'connected': True,
+                'total_slots': slot_count,
+                'occupied': occupied_slots,
+                'free': slot_count - occupied_slots,
+                'active_vehicles': active_txns
+            }
+        }), 200
+    
+    except Exception as e:
+        logger.error(f'[HEALTH] Error: {e}')
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/detect', methods=['POST'])
 def detect_plate():
-    """Universal endpoint for plate detection"""
-    plate = request.form.get('plate', '').strip().upper()
-    
-    if not plate:
-        return jsonify({'success': False, 'error': 'Plate number required'})
-    
-    logger.info(f'[DETECT] Plate detected: {plate}')
-    
+    """Detect plate from video and allocate slot"""
     try:
-        existing_txn = Transaction.query.filter_by(plate=plate, time_out=None).first()
+        plate = request.form.get('plate')
         
-        if existing_txn:
-            logger.info(f'[DETECT] Plate {plate} FOUND. Processing as EXIT.')
-            return exit_vehicle_internal(plate, existing_txn)
-        else:
-            logger.info(f'[DETECT] Plate {plate} NOT found. Processing as ENTRY.')
-            return entry_vehicle_internal(plate)
-            
+        if not plate:
+            return jsonify({'success': False, 'error': 'No plate provided'}), 400
+        
+        logger.info(f'[DETECT] Processing plate: {plate}')
+        
+        # Check if vehicle already parked
+        existing = Transaction.query.filter_by(plate=plate, time_out=None).first()
+        
+        if existing:
+            logger.warning(f'[DETECT] Vehicle {plate} already parked in slot {existing.slot.number}')
+            return jsonify({
+                'success': False,
+                'error': 'Vehicle already in parking',
+                'slot_number': existing.slot.number,
+                'action': 'ALREADY_PARKED'
+            }), 409
+        
+        # Find free slot
+        free_slot = Slot.query.filter_by(status='free').first()
+        
+        if not free_slot:
+            logger.error('[DETECT] No free slots available')
+            return jsonify({
+                'success': False,
+                'error': 'Parking lot full',
+                'action': 'FULL'
+            }), 503
+        
+        # Create transaction
+        txn = Transaction(
+            plate=plate,
+            slot_id=free_slot.id,
+            time_in=datetime.now()
+        )
+        
+        free_slot.status = 'occupied'
+        free_slot.current_txn_id = txn.id
+        
+        db.session.add(txn)
+        db.session.commit()
+        
+        logger.info(f'[ENTRY] Vehicle {plate} -> Slot {free_slot.number}')
+        
+        return jsonify({
+            'success': True,
+            'action': 'ENTRY',
+            'slot_number': free_slot.number,
+            'plate': plate,
+            'transaction_id': txn.id,
+            'message': f'Slot {free_slot.number} allocated'
+        }), 200
+    
     except Exception as e:
-        db.session.rollback()
         logger.error(f'[DETECT] Error: {e}', exc_info=True)
-        return jsonify({'success': False, 'error': str(e)})
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/entry', methods=['POST'])
 def manual_entry():
@@ -205,7 +269,8 @@ def manual_entry():
                 'action': 'entry'
             })
         
-        return entry_vehicle_internal(plate)
+        result = entry_vehicle_internal(plate)
+        return jsonify(result)
     except Exception as e:
         db.session.rollback()
         logger.error(f'[MANUAL ENTRY] Error: {e}', exc_info=True)
@@ -230,7 +295,8 @@ def manual_exit():
                 'action': 'exit'
             })
         
-        return exit_vehicle_internal(plate, txn)
+        result = exit_vehicle_internal(plate, txn)
+        return jsonify(result)
     except Exception as e:
         db.session.rollback()
         logger.error(f'[MANUAL EXIT] Error: {e}', exc_info=True)
@@ -327,14 +393,77 @@ def process_payment(txn_id):
         logger.error(f'[PAYMENT] Payment processing error: {e}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/health', methods=['GET'])
-def health():
-    """Health check endpoint"""
+@app.route('/api/video/process', methods=['POST'])
+def process_video():
+    """Process uploaded video for plate detection"""
     try:
-        db.session.execute('SELECT 1')
-        return jsonify({'status': 'healthy', 'database': 'connected'})
+        if 'video' not in request.files:
+            return jsonify({'success': False, 'error': 'No video file provided'})
+        
+        video_file = request.files['video']
+        
+        # Save video temporarily
+        temp_path = os.path.join('temp_videos', video_file.filename)
+        os.makedirs('temp_videos', exist_ok=True)
+        video_file.save(temp_path)
+        
+        # Process video
+        from anpr_yolo_easyocr import process_video_stream
+        
+        detections = []
+        
+        def callback(plate_data):
+            detections.append({
+                'plate': plate_data['plate'],
+                'timestamp': plate_data['timestamp'],
+                'frame': plate_data['frame_number']
+            })
+        
+        success = process_video_stream(temp_path, callback=callback, confidence_threshold=0.7)
+        
+        # Clean up
+        try:
+            os.remove(temp_path)
+        except:
+            pass
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Video processed. Found {len(detections)} plates.',
+                'detections': detections
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Video processing failed'})
+            
     except Exception as e:
-        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+        logger.error(f'Video processing error: {e}')
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/camera/start', methods=['POST'])
+def start_camera():
+    """Start camera for real-time processing"""
+    try:
+        camera_source = request.form.get('source', '0')
+        
+        # Start processing in background thread
+        from anpr_yolo_easyocr import process_video_realtime
+        
+        def process_thread():
+            process_video_realtime(camera_source, display=True)
+        
+        thread = threading.Thread(target=process_thread, daemon=True)
+        thread.start()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Camera processing started on source {camera_source}',
+            'thread_alive': thread.is_alive()
+        })
+        
+    except Exception as e:
+        logger.error(f'Camera start error: {e}')
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     with app.app_context():
