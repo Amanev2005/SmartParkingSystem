@@ -6,3 +6,6 @@ easyocr
 pillow
 numpy
 requests
+torch
+torchvision
+qrcode

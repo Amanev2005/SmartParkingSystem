@@ -32,6 +32,14 @@ def allocation():
     txn_id = request.args.get('txn', None)
     return render_template('slot_allocated.html', slot=slot, plate=plate, txn_id=txn_id)
 
+@app.route('/exit.html')
+def exit_page():
+    """Show exit and payment page"""
+    plate = request.args.get('plate', 'KL07AN0990')
+    slot = request.args.get('slot', 'P01')
+    fee = request.args.get('fee', '85.00')
+    return render_template('exit.html', plate=plate, slot=slot, fee=fee)
+
 @app.route('/api/latest-exit', methods=['GET'])
 def latest_exit():
     """Get the latest vehicle exit event"""
@@ -45,6 +53,11 @@ def latest_exit():
                 'success': True,
                 'slot_number': event['slot'],
                 'plate': event['plate'],
+                'transaction_id': event.get('transaction_id'),
+                'time_in': event.get('time_in'),
+                'time_out': event.get('time_out'),
+                'duration_minutes': event.get('duration_minutes'),
+                'fee': event.get('fee'),
                 'message': 'Thank you. Visit again..Bye'
             }), 200
         else:
@@ -336,6 +349,15 @@ def exit_vehicle():
         # Mark transaction as exited
         txn.time_out = datetime.now()
         
+        # Calculate fee
+        duration_seconds = (txn.time_out - txn.time_in).total_seconds()
+        duration_minutes = math.ceil(duration_seconds / 60.0)
+        charge = max(MIN_CHARGE, duration_minutes * RATE_PER_MINUTE)
+        
+        txn.duration_minutes = duration_minutes
+        txn.charge = round(charge, 2)
+        txn.payment_status = 'pending'
+        
         # Free the slot
         slot = txn.slot
         if slot:
@@ -350,7 +372,12 @@ def exit_vehicle():
         latest_exit_event = {
             'plate': plate,
             'slot': slot.number if slot else None,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'transaction_id': txn.id,
+            'time_in': txn.time_in.isoformat(),
+            'time_out': txn.time_out.isoformat(),
+            'duration_minutes': duration_minutes,
+            'fee': round(charge, 2)
         }
         
         return jsonify({
@@ -616,6 +643,6 @@ if __name__ == '__main__':
             logger.info(f'[DB] ✓ Database already has {slot_count} slots')
     
     logger.info('Starting Flask server on http://localhost:5000')
-    logger.info('User page server on http://localhost:5000/allocation ')
-
+    logger.info('entry page server on http://localhost:5000/allocation ')
+    logger.info('exit page server on http://localhost:5000/exit.html')
     app.run(debug=True, host='localhost', port=5000)
