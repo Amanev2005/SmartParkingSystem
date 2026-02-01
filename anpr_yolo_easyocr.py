@@ -1,3 +1,7 @@
+import os
+os.environ["OPENCV_LOG_LEVEL"] = "OFF"
+os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
+
 import numpy as np
 import cv2
 from ultralytics import YOLO
@@ -8,7 +12,7 @@ from datetime import datetime
 from collections import defaultdict, Counter
 import time
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO)  # Back to INFO for clean output
 logger = logging.getLogger(__name__)
 
 # Frame Aggregation System - Vote on plates across multiple frames
@@ -119,29 +123,36 @@ def enhance_plate_image(plate_crop):
         else:
             gray = plate_crop
         
-        # Upscale if too small
+        # Upscale if too small - more aggressive
         h, w = gray.shape
-        if w < 200:
-            scale_factor = max(2, 300 / w)
+        if w < 250:
+            scale_factor = max(2.5, 350 / w)  # Increased scale
             gray = cv2.resize(gray, None, fx=scale_factor, fy=scale_factor, 
                             interpolation=cv2.INTER_CUBIC)
+        
+        # Denoise first
+        gray = cv2.fastNlMeansDenoising(gray, h=10)
+        
+        # Sharpen the image
+        kernel_sharpen = np.array([[-1,-1,-1],
+                                   [-1, 9,-1],
+                                   [-1,-1,-1]])
+        gray = cv2.filter2D(gray, -1, kernel_sharpen)
         
         # Histogram equalization
         gray = cv2.equalizeHist(gray)
         
-        # Denoise
-        gray = cv2.fastNlMeansDenoising(gray, h=10)
-        
         # Bilateral filter
         gray = cv2.bilateralFilter(gray, 9, 75, 75)
         
-        # Contrast and brightness adjustment
-        alpha = 1.5  # Contrast
-        beta = 30    # Brightness
+        # Stronger contrast and brightness adjustment
+        alpha = 1.8  # Contrast (increased from 1.5)
+        beta = 40    # Brightness (increased from 30)
         gray = cv2.convertScaleAbs(gray, alpha=alpha, beta=beta)
         
-        # Thresholding - try multiple approaches
-        _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+        # Adaptive thresholding for better results
+        binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                       cv2.THRESH_BINARY, 11, 2)
         
         return binary
     except Exception as e:
@@ -150,9 +161,9 @@ def enhance_plate_image(plate_crop):
 
 def correct_ocr_text(raw_text):
     """
-    Conservative OCR error correction based on Indian plate format
+    Flexible OCR error correction for Indian plates
     Format: XX DD XX DDDD (state code, district, series, registration)
-    Only fix obvious mistakes, NO aggressive character conversion
+    Now accepts 8-10 characters for better detection
     """
     if not raw_text:
         return None
@@ -160,48 +171,66 @@ def correct_ocr_text(raw_text):
     # Remove spaces and convert to uppercase
     text = re.sub(r'\s+', '', raw_text.upper())
     
-    # CONSERVATIVE: Only fix pipe and lowercase L to I
+    # Fix common OCR errors
     text = text.replace('|', 'I')
     text = text.replace('l', 'I')
+    text = text.replace('O', '0')  # O to 0 in number positions
+    text = text.replace('{', 'K')
+    text = text.replace('(', 'C')
+    text = text.replace('[', 'L')
+    text = text.replace(']', 'J')
     
     # Remove non-alphanumeric
     text = re.sub(r'[^A-Z0-9]', '', text)
     
-    # STRICT: Must be EXACTLY 10 characters
-    if len(text) != 10:
-        logger.debug(f'[CORRECT] Invalid length: {raw_text} (len={len(text)})')
+    # FLEXIBLE: Accept 8-10 characters (handles missing chars from OCR)
+    if len(text) < 8 or len(text) > 10:
+        logger.debug(f'[CORRECT] Invalid length: {raw_text} (len={len(text)}, need 8-10)')
         return None
     
-    corrected = list(text)
-    
-    # Position-based STRICT validation (no conversions)
-    try:
-        # Positions 0,1: State code - MUST be LETTERS
-        if not (corrected[0].isalpha() and corrected[1].isalpha()):
-            logger.debug(f'[CORRECT] Invalid state at 0-1: {text}')
-            return None
-        
-        # Positions 2,3: District - MUST be alphanumeric
-        if not (corrected[2].isalnum() and corrected[3].isalnum()):
-            logger.debug(f'[CORRECT] Invalid district at 2-3: {text}')
-            return None
-        
-        # Positions 4,5: Series - MUST be LETTERS
-        if not (corrected[4].isalpha() and corrected[5].isalpha()):
-            logger.debug(f'[CORRECT] Invalid series at 4-5: {text}')
-            return None
-        
-        # Positions 6-9: Registration - MUST be DIGITS
-        if not all(corrected[i].isdigit() for i in [6, 7, 8, 9]):
-            logger.debug(f'[CORRECT] Invalid registration at 6-9: {text}')
-            return None
-    
-    except IndexError:
+    # Basic validation: should have letters and numbers
+    if not any(c.isalpha() for c in text):
+        logger.debug(f'[CORRECT] No letters found: {text}')
         return None
     
-    result = ''.join(corrected)
-    logger.debug(f'[CORRECT] ✓ Valid plate: {result}')
-    return result
+    if not any(c.isdigit() for c in text):
+        logger.debug(f'[CORRECT] No digits found: {text}')
+        return None
+    
+    # For 10-character plates, do strict validation
+    if len(text) == 10:
+        try:
+            # Positions 0,1: State code - should be LETTERS
+            if not (text[0].isalpha() and text[1].isalpha()):
+                logger.debug(f'[CORRECT] Invalid state at 0-1: {text}')
+                return None
+            
+            # Positions 4,5: Series - should be LETTERS
+            if not (text[4].isalpha() and text[5].isalpha()):
+                logger.debug(f'[CORRECT] Invalid series at 4-5: {text}')
+                return None
+            
+            # Positions 6-9: Registration - should be DIGITS
+            if not all(text[i].isdigit() for i in [6, 7, 8, 9]):
+                logger.debug(f'[CORRECT] Invalid registration at 6-9: {text}')
+                return None
+        except IndexError:
+            return None
+    
+    # For 8-9 character plates, just check basic pattern
+    else:
+        # Should start with letters
+        if not text[0].isalpha():
+            logger.debug(f'[CORRECT] Should start with letter: {text}')
+            return None
+        
+        # Should end with digits
+        if not text[-1].isdigit():
+            logger.debug(f'[CORRECT] Should end with digit: {text}')
+            return None
+    
+    logger.debug(f'[CORRECT] ✓ Valid plate: {text} (from: {raw_text})')
+    return text
 
 def recognize_plate_from_frame(frame_bgr, debug=False):
     """Optimized plate detection"""
@@ -222,9 +251,9 @@ def recognize_plate_from_frame(frame_bgr, debug=False):
         logger.error(f'[FRAME] Error: {e}')
         return None
 
-    # YOLO detection - Balanced confidence threshold (0.2 to catch plates)
+    # YOLO detection - Lower confidence threshold to catch more plates
     try:
-        results = model(img_rgb, imgsz=640, conf=0.2, iou=0.4, verbose=False, device='cpu')
+        results = model(img_rgb, imgsz=640, conf=0.15, iou=0.4, verbose=False, device='cpu')
     except Exception as e:
         logger.error(f'[YOLO] Error: {e}')
         return None
@@ -286,19 +315,19 @@ def recognize_plate_from_frame(frame_bgr, debug=False):
             
             for (bbox, text, conf) in ocr_results:
                 text = text.strip()
-                if text and len(text) > 0 and conf >= 0.2:
+                if text and len(text) > 0 and conf >= 0.1:
                     texts.append(text)
                     confidences.append(conf)
             
             if not texts:
-                logger.debug('[OCR] All results filtered (conf < 0.2)')
+                logger.debug('[OCR] All results filtered (conf < 0.1)')
                 continue
             
             full_text = ''.join(texts)
-            avg_ocr_conf = np.mean(confidences) if confidences else 0.2
+            avg_ocr_conf = np.mean(confidences) if confidences else 0.1
             
-            # More forgiving: require average OCR confidence >= 0.3
-            if avg_ocr_conf < 0.3:
+            # High threshold: require average OCR confidence >= 0.30 for quality
+            if avg_ocr_conf < 0.30:
                 logger.debug(f'[OCR] Low avg conf {avg_ocr_conf:.2f}')
                 continue
             
@@ -309,11 +338,11 @@ def recognize_plate_from_frame(frame_bgr, debug=False):
                 logger.debug(f'[DETECT] Correction failed for: {full_text}')
                 continue
             
-            # Combined confidence - more forgiving
+            # Combined confidence - high quality only
             combined_conf = (yolo_conf * 0.4) + (avg_ocr_conf * 0.6)
             
-            # More forgiving: require combined confidence >= 0.35
-            if combined_conf < 0.35:
+            # High threshold: require combined confidence >= 0.50 for accuracy
+            if combined_conf < 0.50:
                 logger.debug(f'[DETECT] Low combined conf {combined_conf:.2f}')
                 continue
             

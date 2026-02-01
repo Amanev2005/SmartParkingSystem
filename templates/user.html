@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parking Slot Allocation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 40px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            max-width: 500px;
+            width: 100%;
+        }
+        .greeting {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .time {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #764ba2;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f0f4ff;
+            border-radius: 5px;
+            display: none;
+        }
+        .result.show {
+            display: block;
+        }
+        .slot-name {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            text-align: center;
+            margin: 15px 0;
+        }
+        .gate-status {
+            text-align: center;
+            padding: 15px;
+            background: #4caf50;
+            color: white;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+        .gate-status.opening {
+            animation: pulse 0.5s;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="greeting" id="greeting"></div>
+        <div class="time" id="time"></div>
+
+        <form id="allocationForm">
+            <div class="form-group">
+                <label for="vehicleNumber">Vehicle Number:</label>
+                <input type="text" id="vehicleNumber" placeholder="e.g., ABC123" required>
+            </div>
+
+            <div class="form-group">
+                <label for="vehicleType">Vehicle Type:</label>
+                <select id="vehicleType" required>
+                    <option value="">Select Type</option>
+                    <option value="car">Car</option>
+                    <option value="bike">Bike</option>
+                    <option value="truck">Truck</option>
+                </select>
+            </div>
+
+            <button type="submit">Allocate Slot</button>
+        </form>
+
+        <div class="result" id="result">
+            <p style="margin: 0; color: #666;">Allocated Parking Slot:</p>
+            <div class="slot-name" id="slotName"></div>
+            <div class="gate-status" id="gateStatus"></div>
+        </div>
+    </div>
+
+    <script>
+        // Display greeting and time
+        function updateGreeting() {
+            const hour = new Date().getHours();
+            let greeting = '';
+            if (hour < 12) greeting = 'Good Morning!';
+            else if (hour < 18) greeting = 'Good Afternoon!';
+            else greeting = 'Good Evening!';
+
+            document.getElementById('greeting').textContent = greeting;
+            updateTime();
+        }
+
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('time').textContent = now.toLocaleString();
+        }
+
+        // Handle form submission
+        document.getElementById('allocationForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const vehicleNumber = document.getElementById('vehicleNumber').value;
+            const vehicleType = document.getElementById('vehicleType').value;
+
+            // Simulate slot allocation (replace with actual API call)
+            const slotName = generateSlotName();
+
+            displayResult(slotName);
+            openGate();
+
+            // Reset form
+            this.reset();
+        });
+
+        function generateSlotName() {
+            const prefix = 'P';
+            const number = String(Math.floor(Math.random() * 99) + 1).padStart(2, '0');
+            return prefix + number;
+        }
+
+        function displayResult(slotName) {
+            document.getElementById('slotName').textContent = slotName;
+            document.getElementById('result').classList.add('show');
+        }
+
+        function openGate() {
+            const gateStatus = document.getElementById('gateStatus');
+            gateStatus.textContent = '🚪 GATE OPENING...';
+            gateStatus.classList.add('opening');
+
+            setTimeout(() => {
+                gateStatus.textContent = '✅ GATE OPENED - PROCEED';
+                gateStatus.classList.remove('opening');
+            }, 500);
+        }
+
+        // Initialize
+        updateGreeting();
+        setInterval(updateTime, 1000);
+    </script>
+</body>
+</html>

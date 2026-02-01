@@ -35,7 +35,7 @@ class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     plate = db.Column(db.String(128), nullable=False, index=True)
     slot_id = db.Column(db.Integer, db.ForeignKey('slots.id'), nullable=True)
-    time_in = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    time_in = db.Column(db.DateTime, nullable=False, default=datetime.now)
     time_out = db.Column(db.DateTime, nullable=True)
     duration_minutes = db.Column(db.Integer, nullable=True)
     charge = db.Column(db.Float, nullable=True)

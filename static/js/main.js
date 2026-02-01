@@ -10,13 +10,13 @@ document.addEventListener('DOMContentLoaded', () => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const pageName = link.dataset.page;
-      
+
       navLinks.forEach(l => l.classList.remove('active'));
       pageContents.forEach(pc => pc.classList.remove('active'));
-      
+
       link.classList.add('active');
       document.getElementById(`${pageName}-page`).classList.add('active');
-      
+
       if (pageName === 'details') {
         loadVehicleDetails();
       }
@@ -42,46 +42,46 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ONLY ONE renderParkingLot function - DELETED THE DUPLICATE
- // Replace the renderParkingLot function with this optimized version
+  // Replace the renderParkingLot function with this optimized version
 
-function renderParkingLot(slots) {
-  if (!Array.isArray(slots) || slots.length === 0) {
-    parkingLot.innerHTML = `
+  function renderParkingLot(slots) {
+    if (!Array.isArray(slots) || slots.length === 0) {
+      parkingLot.innerHTML = `
       <p style="color: #ef4444; text-align: center; padding: 60px 40px; font-size: 1.1em; font-weight: 600;">
         ⚠️ No parking slots available<br>
         <small style="color: #94a3b8; font-size: 0.9em;">Please check if Flask server is running and database is initialized</small>
       </p>
     `;
-    updateStats([]);
-    return;
-  }
+      updateStats([]);
+      return;
+    }
 
-  parkingLot.innerHTML = '';
-  
-  // Create parking slots directly with optimized grid
-  slots.forEach(slot => {
-    const slotEl = document.createElement('div');
-    slotEl.className = 'parking-slot ' + (slot.status === 'occupied' ? 'occupied' : 'available');
-    
-    const isOccupied = slot.status === 'occupied';
-    const carIcon = isOccupied ? '<div class="car-icon">🚗</div>' : '';
-    const plateInfo = isOccupied && slot.plate ? `<div class="slot-plate">${slot.plate}</div>` : '';
-    
-    slotEl.innerHTML = `
+    parkingLot.innerHTML = '';
+
+    // Create parking slots directly with optimized grid
+    slots.forEach(slot => {
+      const slotEl = document.createElement('div');
+      slotEl.className = 'parking-slot ' + (slot.status === 'occupied' ? 'occupied' : 'available');
+
+      const isOccupied = slot.status === 'occupied';
+      const carIcon = isOccupied ? '<div class="car-icon">🚗</div>' : '';
+      const plateInfo = isOccupied && slot.plate ? `<div class="slot-plate">${slot.plate}</div>` : '';
+
+      slotEl.innerHTML = `
       <div class="slot-number">P${String(slot.number).padStart(2, '0')}</div>
       ${carIcon}
       ${plateInfo}
     `;
-    
-    // Add hover tooltip
-    slotEl.title = `Slot ${slot.number} - ${isOccupied ? 'OCCUPIED' : 'AVAILABLE'}${isOccupied && slot.plate ? ` (${slot.plate})` : ''}`;
-    
-    parkingLot.appendChild(slotEl);
-  });
 
-  console.log('[SLOTS] Rendered ' + slots.length + ' slots');
-  updateStats(slots);
-}
+      // Add hover tooltip
+      slotEl.title = `Slot ${slot.number} - ${isOccupied ? 'OCCUPIED' : 'AVAILABLE'}${isOccupied && slot.plate ? ` (${slot.plate})` : ''}`;
+
+      parkingLot.appendChild(slotEl);
+    });
+
+    console.log('[SLOTS] Rendered ' + slots.length + ' slots');
+    updateStats(slots);
+  }
   function loadSlots() {
     console.log('[SLOTS] Loading slots...');
     fetch('/api/slots')
@@ -122,7 +122,7 @@ function renderParkingLot(slots) {
 
   function renderVehicleDetails(vehicles) {
     const container = document.getElementById('detailsContainer');
-    
+
     if (!Array.isArray(vehicles) || vehicles.length === 0) {
       container.innerHTML = '<p style="color: #9ca3af; text-align: center;">No vehicle records found</p>';
       return;
@@ -150,14 +150,22 @@ function renderParkingLot(slots) {
       const statusClass = vehicle.status === 'PARKED' ? 'status-parked' : 'status-exited';
       const paymentClass = vehicle.payment_status === 'paid' ? 'payment-paid' : 'payment-pending';
       const paymentText = vehicle.payment_status === 'paid' ? '✓ PAID' : '⏳ PENDING';
-      
+
       let actionButtons = '';
-      
+
       if (vehicle.payment_status === 'pending' && vehicle.time_out !== 'Still Parked') {
         const chargeAmount = parseFloat(vehicle.charge.replace('₹', ''));
         actionButtons = `
           <div class="action-buttons-group">
-            <button class="btn-pay-slip" onclick="printPaymentSlip(${vehicle.id}, '${vehicle.plate}', '${vehicle.slot_number}', '${vehicle.time_in}', '${vehicle.time_out}', ${vehicle.duration_minutes}, '${vehicle.charge.replace('₹', '')}')">
+            <button class="btn-pay-slip" 
+              data-id="${vehicle.id}"
+              data-plate="${vehicle.plate}"
+              data-slot="${vehicle.slot_number}"
+              data-entry="${vehicle.time_in}"
+              data-exit="${vehicle.time_out}"
+              data-duration="${vehicle.duration_minutes}"
+              data-charge="${vehicle.charge.replace('₹', '')}"
+              onclick="handlePrintSlip(this)">
               🖨️ View Slip
             </button>
             <button class="btn-verify" onclick="openPinModal(${vehicle.id}, '${vehicle.plate}', ${chargeAmount})">
@@ -203,12 +211,18 @@ function renderParkingLot(slots) {
   function printPaymentSlip(txnId, plate, slotNumber, entryTime, exitTime, duration, charge) {
     const pin = generatePin();
     sessionStorage.setItem(`pin_${txnId}`, pin);
-    
+
     const pinData = `PARKING_PIN|${pin}|${plate}|₹${charge}|TXN${txnId}`;
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pinData)}`;
-    
-    const printWindow = window.open('', '_blank', 'width=500,height=900');
-    
+
+    // Open window with specific features
+    const printWindow = window.open('', '_blank', 'width=500,height=900,menubar=no,toolbar=no,location=no,status=no');
+
+    if (!printWindow) {
+      alert('Please allow popups for this website to view the payment slip.');
+      return;
+    }
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -313,10 +327,22 @@ function renderParkingLot(slots) {
       </body>
       </html>
     `;
-    
+
+    printWindow.document.open();
     printWindow.document.write(htmlContent);
     printWindow.document.close();
+
+    // Ensure the window gets focus
+    if (printWindow.focus) printWindow.focus();
   }
+
+  // Wrapper function to handle click from data attributes
+  function handlePrintSlip(btn) {
+    const d = btn.dataset;
+    printPaymentSlip(d.id, d.plate, d.slot, d.entry, d.exit, d.duration, d.charge);
+  }
+
+  window.handlePrintSlip = handlePrintSlip;
 
   window.printPaymentSlip = printPaymentSlip;
 
@@ -325,14 +351,14 @@ function renderParkingLot(slots) {
     window.currentTxnId = txnId;
     window.currentPlate = plate;
     window.currentAmount = amount;
-    
+
     const modal = document.getElementById('pinModal');
     const pinInput = document.getElementById('pinInput');
-    
+
     modal.style.display = 'flex';
     pinInput.value = '';
     pinInput.focus();
-    
+
     const helperText = document.getElementById('pinHelperText');
     helperText.textContent = '';
     helperText.className = 'pin-helper-text';
@@ -350,28 +376,28 @@ function renderParkingLot(slots) {
     const pinInput = document.getElementById('pinInput');
     const enteredPin = pinInput.value.trim();
     const helperText = document.getElementById('pinHelperText');
-    
+
     if (!enteredPin || enteredPin.length !== 6 || !/^\d{6}$/.test(enteredPin)) {
       helperText.textContent = '❌ Please enter a valid 6-digit PIN';
       helperText.className = 'pin-helper-text error';
       pinInput.style.borderColor = '#ef4444';
       return;
     }
-    
+
     const storedPin = sessionStorage.getItem(`pin_${window.currentTxnId}`);
-    
+
     if (!storedPin) {
       helperText.textContent = '❌ PIN not found. Please try again.';
       helperText.className = 'pin-helper-text error';
       pinInput.style.borderColor = '#ef4444';
       return;
     }
-    
+
     if (enteredPin === storedPin) {
       helperText.textContent = '✓ PIN verified! Processing payment...';
       helperText.className = 'pin-helper-text success';
       pinInput.style.borderColor = '#10b981';
-      
+
       setTimeout(() => {
         processPaymentAfterPin();
       }, 1000);
@@ -388,28 +414,28 @@ function renderParkingLot(slots) {
     const txnId = window.currentTxnId;
     const plate = window.currentPlate;
     const amount = window.currentAmount;
-    
+
     if (!txnId) return;
-    
+
     fetch(`/api/payment/process/${txnId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin_verified: true })
     })
-    .then(r => r.json())
-    .then(data => {
-      if (data.success) {
-        showNotification(`✓ Payment successful for ${plate}!`, 'success');
-        closePinModal();
-        loadVehicleDetails();
-        sessionStorage.removeItem(`pin_${txnId}`);
-      } else {
-        showNotification(`✗ Payment failed: ${data.error}`, 'error');
-      }
-    })
-    .catch(err => {
-      showNotification(`✗ Error: ${err}`, 'error');
-    });
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          showNotification(`✓ Payment successful for ${plate}!`, 'success');
+          closePinModal();
+          loadVehicleDetails();
+          sessionStorage.removeItem(`pin_${txnId}`);
+        } else {
+          showNotification(`✗ Payment failed: ${data.error}`, 'error');
+        }
+      })
+      .catch(err => {
+        showNotification(`✗ Error: ${err}`, 'error');
+      });
   }
 
   window.openPinModal = openPinModal;
@@ -419,16 +445,16 @@ function renderParkingLot(slots) {
   entryForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const plate = entryForm.plate.value.trim().toUpperCase();
-    
+
     if (!plate) {
       showNotification('❌ Please enter a plate number', 'error');
       return;
     }
-    
+
     console.log('[ENTRY] Submitting:', plate);
     const res = await postPlate('/api/entry', plate);
     console.log('[ENTRY] Response:', res);
-    
+
     if (res.success) {
       entryForm.reset();
       loadSlots();
@@ -442,16 +468,16 @@ function renderParkingLot(slots) {
   exitForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const plate = exitForm.plate.value.trim().toUpperCase();
-    
+
     if (!plate) {
       showNotification('❌ Please enter a plate number', 'error');
       return;
     }
-    
+
     console.log('[EXIT] Submitting:', plate);
     const res = await postPlate('/api/exit', plate);
     console.log('[EXIT] Response:', res);
-    
+
     if (res.success) {
       exitForm.reset();
       loadSlots();

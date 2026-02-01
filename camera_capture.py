@@ -1,3 +1,7 @@
+import os
+os.environ["OPENCV_LOG_LEVEL"] = "OFF"  # Suppress FFmpeg warnings
+os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"  # Suppress FFmpeg overread warnings
+
 import cv2
 import time
 import requests
@@ -19,13 +23,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 API_DETECT = 'http://localhost:5000/api/detect'
+API_EXIT = 'http://localhost:5000/api/exit-vehicle'
 API_HEALTH = 'http://localhost:5000/api/health'
 
 # Confidence and deduplication settings
-REQUIRED_DETECTIONS = 1  # Only need 1 detection instead of 2
+REQUIRED_DETECTIONS = 1  # Fast detection (1 high-confidence detection)
 DETECTION_TIME_WINDOW = 10  # seconds
 SIMILARITY_THRESHOLD = 0.85
 DUPLICATE_IGNORE_SECONDS = 20
+GLOBAL_DETECTION_COOLDOWN = 3  # Minimum seconds between ANY detections
 
 # Performance tuning
 FRAME_QUEUE_MAX = 3
@@ -39,10 +45,11 @@ LOCAL_CAMERA_ID = 0  # Fallback to local camera (0=default webcam)
 # Plate detection tracking
 plate_detections = {}  # plate -> [(timestamp, confidence)]
 processed_plates = {}  # plate -> last_api_time
+last_global_detection_time = 0  # Track last detection time globally
 
 def string_similarity(a, b):
     """Calculate string similarity (0-1)"""
-    return SequenceMatcher(None, a, b).ratio()
+    return SequenceMatcher(None, a, b).ratio()  
 
 
 
@@ -161,8 +168,16 @@ def should_process_plate(plate):
             logger.debug(f'[DUPLICATE] {target_plate} processed {time_since_last:.0f}s ago')
             return False, target_plate
     
+    # Check global cooldown (prevent rapid detections of different plates)
+    global last_global_detection_time
+    time_since_last_global = now - last_global_detection_time
+    if time_since_last_global < GLOBAL_DETECTION_COOLDOWN:
+        logger.debug(f'[COOLDOWN] Global cooldown active ({time_since_last_global:.1f}s < {GLOBAL_DETECTION_COOLDOWN}s)')
+        return False, target_plate
+    
     logger.info(f'[CONFIDENCE] {target_plate} confirmed ({detection_count} detections)')
     processed_plates[target_plate] = now
+    last_global_detection_time = now
     plate_detections[target_plate] = []
     
     return True, target_plate
@@ -179,18 +194,49 @@ def send_to_api(plate_text):
                 action = result.get('action', 'UNKNOWN').upper()
                 message = result.get('message', 'Success')
                 logger.info(f'[✓ {action}] {plate_text}: {message}')
+                # Mark as processed to prevent re-sending
+                processed_plates[plate_text] = time.time()
+                return True
             else:
                 error = result.get('error', 'Unknown error')
                 logger.warning(f'[✗ API] {plate_text}: {error}')
+                return False
+        
+        elif resp.status_code == 409:
+            # 409 = Vehicle already parked (vehicle is exiting!)
+            result = resp.json()
+            slot_num = result.get('slot_number', '?')
+            logger.info(f'[EXIT-DETECTED] {plate_text} leaving from slot {slot_num}')
+            
+            # Call exit endpoint to free the slot
+            try:
+                exit_resp = requests.post(API_EXIT, data={'plate': plate_text}, timeout=5)
+                if exit_resp.status_code == 200:
+                    exit_result = exit_resp.json()
+                    goodbye_msg = exit_result.get('goodbye_message', 'Thank you. Visit again..Bye')
+                    logger.info(f'[✓ EXIT] {plate_text}: {goodbye_msg}')
+                else:
+                    logger.warning(f'[✗ EXIT] HTTP {exit_resp.status_code}')
+            except Exception as e:
+                logger.error(f'[✗ EXIT-API] Error: {e}')
+            
+            # Mark as processed
+            processed_plates[plate_text] = time.time()
+            return True  # Treat as handled
+        
         else:
-            logger.error(f'[✗ API] HTTP {resp.status_code}')
+            logger.error(f'[✗ API] HTTP {resp.status_code}: {resp.text}')
+            return False
             
     except requests.exceptions.Timeout:
         logger.error(f'[✗ API] Timeout sending {plate_text}')
+        return False
     except requests.exceptions.ConnectionError:
         logger.error(f'[✗ API] Cannot connect to Flask API')
+        return False
     except Exception as e:
         logger.error(f'[✗ API] Error: {e}')
+        return False
 
 def _worker_process(q: queue.Queue, stop_event: threading.Event):
     """Worker thread for frame processing"""

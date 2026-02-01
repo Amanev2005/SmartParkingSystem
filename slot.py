@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from models import db, Slot, Transaction, create_app
 from datetime import datetime
 import logging
@@ -13,13 +13,71 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-RATE_PER_MINUTE = 5.0
+RATE_PER_MINUTE = 10.0
 MIN_CHARGE = 10.0
+
+# Store latest exit event for real-time display
+latest_exit_event = {'plate': None, 'slot': None, 'timestamp': None}
 
 @app.route('/')
 def index():
     """Serve the main dashboard page"""
     return render_template('index.html')
+
+@app.route('/allocation')
+def allocation():
+    """Show slot allocation confirmation page"""
+    slot = request.args.get('slot', 'A-01')
+    plate = request.args.get('plate', 'UNKNOWN')
+    txn_id = request.args.get('txn', None)
+    return render_template('slot_allocated.html', slot=slot, plate=plate, txn_id=txn_id)
+
+@app.route('/api/latest-exit', methods=['GET'])
+def latest_exit():
+    """Get the latest vehicle exit event"""
+    global latest_exit_event
+    try:
+        if latest_exit_event['plate']:
+            event = latest_exit_event.copy()
+            # Reset for next event
+            latest_exit_event = {'plate': None, 'slot': None, 'timestamp': None}
+            return jsonify({
+                'success': True,
+                'slot_number': event['slot'],
+                'plate': event['plate'],
+                'message': 'Thank you. Visit again..Bye'
+            }), 200
+        else:
+            return jsonify({'success': False, 'message': 'No recent exits'}), 200
+    except Exception as e:
+        logger.error(f'[LATEST_EXIT] Error: {e}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/latest-allocation', methods=['GET'])
+def latest_allocation():
+    """Get the latest vehicle allocation (for real-time display)"""
+    try:
+        # Get the most recent transaction that has a slot allocated (not exited)
+        latest_txn = Transaction.query.filter_by(time_out=None).order_by(
+            Transaction.time_in.desc()
+        ).first()
+        
+        if latest_txn and latest_txn.slot:
+            return jsonify({
+                'success': True,
+                'slot_number': latest_txn.slot.number,
+                'plate': latest_txn.plate,
+                'transaction_id': latest_txn.id,
+                'time_in': str(latest_txn.time_in)
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'No active allocations'
+            }), 200
+    except Exception as e:
+        logger.error(f'[LATEST_ALLOCATION] Error: {e}')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/slots', methods=['GET'])
 def get_slots():
@@ -96,7 +154,7 @@ def entry_vehicle_internal(plate):
         
         logger.info(f'[ENTRY] Found available slot: {available_slot.number}')
         
-        txn = Transaction(plate=plate, slot_id=available_slot.id, time_in=datetime.utcnow())
+        txn = Transaction(plate=plate, slot_id=available_slot.id, time_in=datetime.now())
         db.session.add(txn)
         db.session.flush()
         
@@ -126,7 +184,7 @@ def exit_vehicle_internal(plate, txn):
     try:
         logger.info(f'[EXIT] Starting exit process for plate: {plate}')
         
-        txn.time_out = datetime.utcnow()
+        txn.time_out = datetime.now()
         duration_seconds = (txn.time_out - txn.time_in).total_seconds()
         duration_minutes = math.ceil(duration_seconds / 60.0)
         
@@ -228,10 +286,12 @@ def detect_plate():
             time_in=datetime.now()
         )
         
+        db.session.add(txn)
+        db.session.flush()  # Get the txn.id before using it
+        
         free_slot.status = 'occupied'
         free_slot.current_txn_id = txn.id
         
-        db.session.add(txn)
         db.session.commit()
         
         logger.info(f'[ENTRY] Vehicle {plate} -> Slot {free_slot.number}')
@@ -242,11 +302,68 @@ def detect_plate():
             'slot_number': free_slot.number,
             'plate': plate,
             'transaction_id': txn.id,
-            'message': f'Slot {free_slot.number} allocated'
+            'message': f'Slot {free_slot.number} allocated',
+            'allocation_url': f'/allocation?slot={free_slot.number}&plate={plate}&txn={txn.id}'
         }), 200
     
     except Exception as e:
         logger.error(f'[DETECT] Error: {e}', exc_info=True)
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/exit-vehicle', methods=['POST'])
+def exit_vehicle():
+    """Handle vehicle exit - free the slot when plate is detected again"""
+    try:
+        plate = request.form.get('plate')
+        
+        if not plate:
+            return jsonify({'success': False, 'error': 'No plate provided'}), 400
+        
+        logger.info(f'[EXIT] Processing exit for plate: {plate}')
+        
+        # Find the active transaction for this plate
+        txn = Transaction.query.filter_by(plate=plate, time_out=None).first()
+        
+        if not txn:
+            logger.warning(f'[EXIT] No active transaction found for plate: {plate}')
+            return jsonify({
+                'success': False,
+                'error': 'Vehicle not found in parking',
+                'action': 'NOT_FOUND'
+            }), 404
+        
+        # Mark transaction as exited
+        txn.time_out = datetime.now()
+        
+        # Free the slot
+        slot = txn.slot
+        if slot:
+            slot.status = 'free'
+            slot.current_txn_id = None
+            logger.info(f'[EXIT] ✓ Vehicle {plate} exited from Slot {slot.number}')
+        
+        db.session.commit()
+        
+        # Store exit event for real-time display
+        global latest_exit_event
+        latest_exit_event = {
+            'plate': plate,
+            'slot': slot.number if slot else None,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        return jsonify({
+            'success': True,
+            'action': 'EXIT',
+            'slot_number': slot.number if slot else None,
+            'plate': plate,
+            'message': 'Thank you. Visit again..Bye',
+            'goodbye_message': 'Thank you. Visit again..Bye'
+        }), 200
+    
+    except Exception as e:
+        logger.error(f'[EXIT] Error: {e}', exc_info=True)
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -296,6 +413,16 @@ def manual_exit():
             })
         
         result = exit_vehicle_internal(plate, txn)
+        
+        # Store exit event for real-time display
+        if result['success']:
+            global latest_exit_event
+            latest_exit_event = {
+                'plate': plate,
+                'slot': result.get('slot_number'),
+                'timestamp': datetime.now().isoformat()
+            }
+        
         return jsonify(result)
     except Exception as e:
         db.session.rollback()
@@ -489,4 +616,6 @@ if __name__ == '__main__':
             logger.info(f'[DB] ✓ Database already has {slot_count} slots')
     
     logger.info('Starting Flask server on http://localhost:5000')
+    logger.info('User page server on http://localhost:5000/allocation ')
+
     app.run(debug=True, host='localhost', port=5000)
