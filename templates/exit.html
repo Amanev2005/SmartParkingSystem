@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exit & Payment - Smart Parking</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            animation: slideIn 0.5s ease-out;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+
+        /* Payment Details Section */
+        .payment-details {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            text-align: left;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+            font-weight: 700;
+            font-size: 18px;
+            color: #667eea;
+            margin-top: 10px;
+        }
+
+        .detail-label {
+            color: #666;
+            font-weight: 600;
+        }
+
+        .detail-value {
+            color: #333;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* QR Code Section */
+        .qr-section {
+            background: white;
+            border: 3px solid #667eea;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .qr-title {
+            color: #667eea;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 15px;
+        }
+
+        .qr-code {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 15px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .qr-code canvas {
+            border-radius: 8px;
+        }
+
+        .scan-instruction {
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .pin-display {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+
+        .pin-label {
+            color: #1976D2;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .pin-code {
+            font-size: 32px;
+            font-weight: 900;
+            color: #1976D2;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 8px;
+        }
+
+        @media (max-width: 500px) {
+            .pin-code {
+                font-size: 24px;
+                letter-spacing: 4px;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Payment Page Styles */
+        .payment-form {
+            display: none;
+        }
+
+        .payment-form.active {
+            display: block;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 4px;
+            text-align: center;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .error-message {
+            color: #f44336;
+            font-size: 14px;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        /* Buttons */
+        button {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+            transform: translateY(-2px);
+        }
+
+        /* Success Section */
+        .success-section {
+            display: none;
+        }
+
+        .success-section.active {
+            display: block;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .checkmark {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: #4caf50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .checkmark::after {
+            content: '✓';
+            color: white;
+            font-size: 50px;
+            font-weight: bold;
+        }
+
+        .success-title {
+            color: #4caf50;
+            font-size: 32px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .success-message {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+
+        /* Waiting Screen */
+        .waiting-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .waiting-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+
+        .spinner.active {
+            display: block;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Toll Gate Animation Styles */
+        .toll-gate {
+            width: 180px;
+            height: 120px;
+            margin: 0 auto 10px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            overflow: hidden;
+        }
+
+        .gate-base {
+            width: 24px;
+            height: 60px;
+            background: linear-gradient(90deg, #333, #555);
+            border-radius: 4px 4px 0 0;
+            position: absolute;
+            bottom: 0;
+            right: 40px;
+            z-index: 10;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .gate-base::after {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 12px;
+            height: 12px;
+            background: #ff3333;
+            border-radius: 50%;
+            box-shadow: 0 0 5px #ff3333;
+            animation: lightBlink 1s infinite alternate;
+        }
+
+        @keyframes lightBlink {
+            from {
+                opacity: 0.5;
+            }
+
+            to {
+                opacity: 1;
+                box-shadow: 0 0 10px #ff3333;
+            }
+        }
+
+        .gate-bar {
+            width: 160px;
+            height: 14px;
+            background: repeating-linear-gradient(90deg,
+                    #cc0000,
+                    #cc0000 25px,
+                    #ffffff 25px,
+                    #ffffff 50px);
+            border: 1px solid #a00;
+            border-radius: 8px;
+            position: absolute;
+            bottom: 45px;
+            right: 50px;
+            /* Pivot point around the base */
+            transform-origin: 95% 50%;
+            transform: rotate(0deg);
+            /* Default Closed */
+            z-index: 5;
+            box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Animation classes */
+        .success-section.active .gate-bar {
+            animation: barrierCycle 8s ease-in-out forwards;
+        }
+
+        .success-section.active .gate-base::after {
+            background: #4caf50;
+            /* Turn light green on success */
+            box-shadow: 0 0 10px #4caf50;
+            animation: none;
+        }
+
+        @keyframes barrierCycle {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            15% {
+                transform: rotate(-85deg);
+            }
+
+            /* Open Fast */
+            75% {
+                transform: rotate(-85deg);
+            }
+
+            /* Hold Open */
+            100% {
+                transform: rotate(0deg);
+            }
+
+            /* Close */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Waiting Screen -->
+        <div id="waitingSection" class="waiting-screen">
+            <!-- Static Closed Toll Gate -->
+            <div class="toll-gate">
+                <div class="gate-base"></div>
+                <div class="gate-bar"></div>
+            </div>
+            <h1>Waiting for Vehicle...</h1>
+            <p class="subtitle">Please drive to the exit gate</p>
+            <div class="spinner active" style="margin-top: 0;"></div>
+        </div>
+
+        <!-- Initial Payment Details & QR Code Section -->
+        <div id="qrSection" class="hidden">
+            <h1>Exit & Payment</h1>
+            <p class="subtitle">Please complete your payment to exit</p>
+
+            <!-- Parking Details -->
+            <div class="payment-details">
+                <div class="detail-row">
+                    <span class="detail-label">Vehicle Number:</span>
+                    <span class="detail-value" id="vehicleNumber">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Slot Number:</span>
+                    <span class="detail-value" id="slotNumber">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Time In:</span>
+                    <span class="detail-value" id="timeIn">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Time Out:</span>
+                    <span class="detail-value" id="timeOut">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Duration:</span>
+                    <span class="detail-value" id="duration">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Parking Fee:</span>
+                    <span class="detail-value" id="parkingFee">--</span>
+                </div>
+            </div>
+
+            <!-- QR Code Section -->
+            <div class="qr-section">
+                <div class="qr-title">Scan QR Code to Pay</div>
+                <div class="qr-code" id="qrCodeContainer"></div>
+                <p class="scan-instruction">Scan this QR code with any UPI app to proceed</p>
+
+                <!-- PIN Display -->
+                <div class="pin-display">
+                    <div class="pin-label">Your Payment PIN:</div>
+                    <div class="pin-code" id="generatedPin">--</div>
+                    <p style="font-size: 12px; color: #666; margin-top: 8px;">Enter this PIN on the next screen to
+                        complete payment</p>
+                </div>
+            </div>
+
+            <button class="btn-primary" onclick="proceedToPayment()">Enter Payment PIN</button>
+        </div>
+
+        <!-- Payment Form Section -->
+        <div id="paymentSection" class="payment-form">
+            <h1>Complete Payment</h1>
+            <p class="subtitle">Enter your payment PIN to confirm</p>
+
+            <div class="payment-details">
+                <div class="detail-row">
+                    <span class="detail-label">Amount to Pay:</span>
+                    <span class="detail-value" id="paymentAmount">--</span>
+                </div>
+            </div>
+
+            <form id="pinForm" onsubmit="verifyPin(event)">
+                <div class="form-group">
+                    <label class="form-label" for="pinInput">Enter 4-Digit PIN:</label>
+                    <input type="text" id="pinInput" class="form-input" maxlength="4" pattern="[0-9]{4}"
+                        placeholder="****" required autocomplete="off">
+                    <div class="error-message" id="pinError">Incorrect PIN. Please try again.</div>
+                </div>
+
+                <button type="submit" class="btn-primary" id="submitBtn">Confirm Payment</button>
+                <button type="button" class="btn-secondary" onclick="backToQR()">Back to QR Code</button>
+            </form>
+
+            <div class="spinner" id="loadingSpinner"></div>
+        </div>
+
+        <!-- Success Section -->
+        <div id="successSection" class="success-section">
+            <div class="toll-gate">
+                <div class="gate-base"></div>
+                <div class="gate-bar"></div>
+            </div>
+            <h2 class="success-title">Payment Successful!</h2>
+            <p class="success-message">Gate Opening...</p>
+
+            <div class="payment-details">
+                <div class="detail-row">
+                    <span class="detail-label">Vehicle Number:</span>
+                    <span class="detail-value" id="successVehicle">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Amount Paid:</span>
+                    <span class="detail-value" id="successAmount">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Payment Time:</span>
+                    <span class="detail-value" id="paymentTime">--</span>
+                </div>
+            </div>
+
+            <div style="background: #e8f5e9; padding: 20px; border-radius: 10px; margin: 25px 0;">
+                <p style="color: #2e7d32; font-size: 18px; font-weight: 600; margin-bottom: 10px;">
+                    🎉 Thank You! Visit Again! 🎉
+                </p>
+                <p style="color: #666; font-size: 14px;">
+                    Have a safe journey. We look forward to serving you again.
+                </p>
+            </div>
+
+            <!-- Removed Exit button as requested -->
+            <p style="color: #999; font-size: 12px; margin-top: 10px;">Screen will reset automatically...</p>
+        </div>
+    </div>
+
+    <!-- QR Code Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <script>
+        let currentPin = '0000';
+        let isPolling = true;
+        let lastPlate = null;
+        let currentTxnId = null;
+        let resetTimeout = null;
+        let pollingInterval = null;
+
+        // On Load
+        document.addEventListener('DOMContentLoaded', () => {
+            startPolling();
+
+            // Generate random PIN initially
+            currentPin = Math.floor(1000 + Math.random() * 9000).toString();
+            document.getElementById('generatedPin').textContent = currentPin;
+
+            // Check if URL params exist (manual test mode)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('plate')) {
+                const data = {
+                    plate: urlParams.get('plate'),
+                    slot_number: urlParams.get('slot') || 'P01',
+                    fee: parseFloat(urlParams.get('fee') || '85.00'),
+                    duration_minutes: 120, // Default for test
+                    time_in: new Date(Date.now() - 7200000).toISOString(),
+                    time_out: new Date().toISOString(),
+                    transaction_id: null // No txn ID in manual test
+                };
+                showVehicleData(data);
+                stopPolling();
+            }
+        });
+
+        function startPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(fetchLatestExit, 1000);
+        }
+
+        function stopPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+        }
+
+        async function fetchLatestExit() {
+            if (!isPolling) return;
+
+            try {
+                const response = await fetch('/api/latest-exit');
+                const data = await response.json();
+
+                if (data.success && data.plate && data.plate !== lastPlate) {
+                    console.log('Vehicle detected:', data);
+                    lastPlate = data.plate;
+
+                    // We need fee and duration from the API response
+                    // If not present in response yet (due to API implementation), we calculate locally
+                    // But our updated slot.py sends it!
+
+                    showVehicleData(data);
+                }
+            } catch (error) {
+                console.error('Error fetching exit data:', error);
+            }
+        }
+
+        function showVehicleData(data) {
+            // Hide waiting, Show QR
+            document.getElementById('waitingSection').style.display = 'none';
+            document.getElementById('qrSection').classList.remove('hidden');
+            document.getElementById('paymentSection').classList.remove('active');
+            document.getElementById('successSection').classList.remove('active');
+
+            // Store transaction ID
+            currentTxnId = data.transaction_id;
+
+            // Generate new PIN
+            currentPin = Math.floor(1000 + Math.random() * 9000).toString();
+            document.getElementById('generatedPin').textContent = currentPin;
+
+            // Parse Data
+            const fee = data.fee || 85.00; // Fallback
+            const duration = formatDuration(data.duration_minutes || 0);
+
+            // Format Times
+            const timeIn = new Date(data.time_in || Date.now());
+            const timeOut = new Date(data.time_out || Date.now());
+            const timeOpt = { hour: '2-digit', minute: '2-digit', hour12: true };
+
+            // Update UI
+            document.getElementById('vehicleNumber').textContent = data.plate;
+            document.getElementById('slotNumber').textContent = data.slot_number || 'P01';
+            document.getElementById('parkingFee').textContent = `₹${fee.toFixed(2)}`;
+            document.getElementById('paymentAmount').textContent = `₹${fee.toFixed(2)}`;
+            document.getElementById('duration').textContent = duration;
+            document.getElementById('timeIn').textContent = timeIn.toLocaleTimeString('en-US', timeOpt);
+            document.getElementById('timeOut').textContent = timeOut.toLocaleTimeString('en-US', timeOpt);
+            document.getElementById('successVehicle').textContent = data.plate;
+            document.getElementById('successAmount').textContent = `₹${fee.toFixed(2)}`;
+            document.getElementById('paymentTime').textContent = timeOut.toLocaleTimeString('en-US', timeOpt);
+
+            // Generate QR
+            const qrContainer = document.getElementById("qrCodeContainer");
+            qrContainer.innerHTML = '';
+            const qrData = `upi://pay?pa=parking@upi&pn=SmartParking&am=${fee}&cu=INR&tn=Parking-${data.plate}-PIN:${currentPin}`;
+
+            new QRCode(qrContainer, {
+                text: qrData,
+                width: 180,
+                height: 180,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+
+        function formatDuration(minutes) {
+            const h = Math.floor(minutes / 60);
+            const m = Math.floor(minutes % 60);
+            return `${h}h ${m}m`;
+        }
+
+        // Navigate to payment section
+        function proceedToPayment() {
+            document.getElementById('qrSection').classList.add('hidden');
+            document.getElementById('paymentSection').classList.add('active');
+            document.getElementById('pinInput').focus();
+        }
+
+        // Go back to QR section
+        function backToQR() {
+            document.getElementById('paymentSection').classList.remove('active');
+            document.getElementById('qrSection').classList.remove('hidden');
+            document.getElementById('pinInput').value = '';
+            document.getElementById('pinError').classList.remove('show');
+        }
+
+        // Verify PIN
+        function verifyPin(event) {
+            event.preventDefault();
+
+            const enteredPin = document.getElementById('pinInput').value;
+            const errorMsg = document.getElementById('pinError');
+            const submitBtn = document.getElementById('submitBtn');
+            const spinner = document.getElementById('loadingSpinner');
+
+            submitBtn.disabled = true;
+            spinner.classList.add('active');
+
+            setTimeout(async () => {
+                if (enteredPin === currentPin) {
+
+                    // Update backend payment status
+                    if (currentTxnId) {
+                        try {
+                            const response = await fetch(`/api/payment/process/${currentTxnId}`, {
+                                method: 'POST'
+                            });
+                            console.log('Payment status updated:', await response.json());
+                        } catch (e) {
+                            console.error('Failed to update payment status:', e);
+                        }
+                    }
+
+                    spinner.classList.remove('active');
+                    document.getElementById('paymentSection').classList.remove('active');
+                    document.getElementById('successSection').classList.add('active');
+
+                    // Auto reset after 10 seconds
+                    clearTimeout(resetTimeout);
+                    resetTimeout = setTimeout(resetScreen, 10000);
+                } else {
+                    spinner.classList.remove('active');
+                    submitBtn.disabled = false;
+                    errorMsg.classList.add('show');
+                    document.getElementById('pinInput').value = '';
+                    document.getElementById('pinInput').focus();
+                    setTimeout(() => errorMsg.classList.remove('show'), 3000);
+                }
+            }, 1000);
+        }
+
+        function resetScreen() {
+            // Go back to waiting state
+            document.getElementById('successSection').classList.remove('active');
+            document.getElementById('waitingSection').style.display = 'flex';
+
+            // Clear data
+            lastPlate = null;
+            currentTxnId = null;
+            document.getElementById('pinInput').value = '';
+            document.getElementById('submitBtn').disabled = false;
+
+            // Resume polling
+            isPolling = true;
+        }
+
+        // Input limits
+        document.getElementById('pinInput').addEventListener('input', function (e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+    </script>
+</body>
+
+</html>
