@@ -320,108 +320,32 @@
             font-size: 50px;
             font-weight: bold;
         }
-
-        .available-badge {
-            background: #e8f5e9;
-            color: #2e7d32;
-            padding: 8px 16px;
-            border-radius: 50px;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 14px;
-            font-weight: 700;
-            margin-bottom: 20px;
-            border: 1px solid #c8e6c9;
-        }
-
-        .available-count {
-            font-size: 18px;
-            color: #1b5e20;
-        }
-
-        .processing-section {
-            background: #fff8e1;
-            border: 2px dashed #ffb300;
-            padding: 30px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            animation: fadeIn 0.5s ease-out;
-        }
-
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #ffb300;
-            border-radius: 50%;
-            margin: 0 auto 20px;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        .processing-text {
-            color: #856404;
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .processing-plate {
-            font-family: 'Courier New', monospace;
-            font-size: 24px;
-            letter-spacing: 2px;
-            margin-top: 10px;
-            color: #333;
-        }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <div class="available-badge">
-            <span class="status-dot"></span>
-            <span>Available Slots: <strong class="available-count" id="availableSlots">{{ free_slots }}</strong></span>
-        </div>
-
         <div class="checkmark" id="checkmark"></div>
 
-        <div id="allocationSection">
-            <h1>Slot Allocated!</h1>
-            <p class="subtitle">Your parking slot has been reserved</p>
+        <h1>Slot Allocated!</h1>
+        <p class="subtitle">Your parking slot has been reserved</p>
 
-            <div class="info-section">
-                <div class="info-label">Your Parking Slot</div>
-                <div class="slot-number" id="slotNumber">A-01</div>
+        <div class="info-section">
+            <div class="info-label">Your Parking Slot</div>
+            <div class="slot-number" id="slotNumber">A-01</div>
 
-                <div class="plate-info" id="plateInfo">Loading...</div>
-                <div class="time-info" id="timeInfo"></div>
-            </div>
-
-            <div class="instructions">
-                <h3>📍 Instructions:</h3>
-                <ul>
-                    <li>Proceed to slot <strong id="slotNameInst">A-01</strong></li>
-                    <li>Park your vehicle in the designated area</li>
-                    <li>Keep your number plate clearly visible</li>
-                    <li>Visit the payment counter for payment details</li>
-                </ul>
-            </div>
+            <div class="plate-info" id="plateInfo">Loading...</div>
+            <div class="time-info" id="timeInfo"></div>
         </div>
 
-        <div id="processingSection" class="processing-section" style="display: none;">
-            <div class="spinner"></div>
-            <p class="processing-text">Processing, please wait...</p>
-            <div id="processingPlate" class="processing-plate"></div>
-            <p style="margin-top: 15px; color: #666; font-size: 14px;">Allocating your parking slot</p>
+        <div class="instructions">
+            <h3>📍 Instructions:</h3>
+            <ul>
+                <li>Proceed to slot <strong id="slotNameInst">A-01</strong></li>
+                <li>Park your vehicle in the designated area</li>
+                <li>Keep your number plate clearly visible</li>
+                <li>Visit the payment counter for payment details</li>
+            </ul>
         </div>
 
         <div id="goodbyeSection" class="goodbye-section" style="display: none;">
@@ -538,64 +462,14 @@
 
                         // Update status indicator
                         updateStatusIndicator(true, `Slot ${data.slot_number} allocated`);
-
-                        // Show allocation section, hide processing
-                        document.getElementById('allocationSection').style.display = 'block';
-                        document.getElementById('processingSection').style.display = 'none';
-                        document.getElementById('checkmark').style.display = 'flex';
-
-                        // Also refresh free slots immediately
-                        fetchHealthData();
                     }
                 } else if (!lastKnownSlot) {
                     // Still waiting for first allocation
-                    if (document.getElementById('processingSection').style.display === 'none') {
-                        updateStatusIndicator(false, 'Waiting for vehicles...');
-                    }
+                    updateStatusIndicator(false, 'Waiting for vehicles...');
                 }
             } catch (error) {
                 console.error('Error fetching allocation:', error);
                 updateStatusIndicator(false, 'Connection issue...', true);
-            }
-        }
-
-        /**
-         * Fetch the latest detection
-         */
-        async function fetchLatestDetection() {
-            try {
-                const response = await fetch('/api/latest-detection');
-                const data = await response.json();
-
-                if (data.success && data.plate) {
-                    // Show processing screen
-                    document.getElementById('allocationSection').style.display = 'none';
-                    document.getElementById('goodbyeSection').style.display = 'none';
-                    document.getElementById('checkmark').style.display = 'none';
-                    document.getElementById('actionsSection').style.display = 'none';
-
-                    document.getElementById('processingSection').style.display = 'block';
-                    document.getElementById('processingPlate').textContent = data.plate;
-
-                    updateStatusIndicator(false, `Processing ${data.plate}...`);
-                }
-            } catch (error) {
-                console.error('Error fetching detection:', error);
-            }
-        }
-
-        /**
-         * Fetch health data to update free slot count
-         */
-        async function fetchHealthData() {
-            try {
-                const response = await fetch('/api/health');
-                const data = await response.json();
-                if (data.status === 'healthy' && data.database) {
-                    document.getElementById('availableSlots').textContent = data.database.free;
-                }
-            } catch (error) {
-                console.error('Error fetching health data:', error);
             }
         }
 
@@ -656,26 +530,14 @@
         // Start polling for exit events
         setInterval(fetchLatestExit, updateInterval);
 
-        // Start polling for free slots
-        setInterval(fetchHealthData, updateInterval * 2);
-
-        // Start polling for detections
-        setInterval(fetchLatestDetection, updateInterval);
-
         // Initial fetch
         if (initialSlot && initialPlate) {
             // Already have initial data, start polling
             fetchLatestAllocation();
-            fetchHealthData();
         } else {
-            // Hide everything initially if no data
-            document.getElementById('allocationSection').style.display = 'none';
-            document.getElementById('checkmark').style.display = 'none';
-
             // Show waiting state
             updateStatusIndicator(false, 'Waiting for vehicles...');
             fetchLatestAllocation();
-            fetchHealthData();
         }
 
         /**

@@ -16,9 +16,8 @@ logger = logging.getLogger(__name__)
 RATE_PER_MINUTE = 10.0
 MIN_CHARGE = 10.0
 
-# Store latest events for real-time display
+# Store latest exit event for real-time display
 latest_exit_event = {'plate': None, 'slot': None, 'timestamp': None}
-latest_detection_event = {'plate': None, 'timestamp': None}
 
 @app.route('/')
 def index():
@@ -31,18 +30,15 @@ def allocation():
     slot = request.args.get('slot', 'A-01')
     plate = request.args.get('plate', 'UNKNOWN')
     txn_id = request.args.get('txn', None)
-    
-    # Get current available slots
-    try:
-        free_slots = Slot.query.filter_by(status='free').count()
-    except Exception:
-        free_slots = 0
-        
-    return render_template('slot_allocated.html', 
-                         slot=slot, 
-                         plate=plate, 
-                         txn_id=txn_id,
-                         free_slots=free_slots)
+    return render_template('slot_allocated.html', slot=slot, plate=plate, txn_id=txn_id)
+
+@app.route('/exit.html')
+def exit_page():
+    """Show exit and payment page"""
+    plate = request.args.get('plate', 'KL07AN0990')
+    slot = request.args.get('slot', 'P01')
+    fee = request.args.get('fee', '85.00')
+    return render_template('exit.html', plate=plate, slot=slot, fee=fee)
 
 @app.route('/api/latest-exit', methods=['GET'])
 def latest_exit():
@@ -68,45 +64,6 @@ def latest_exit():
             return jsonify({'success': False, 'message': 'No recent exits'}), 200
     except Exception as e:
         logger.error(f'[LATEST_EXIT] Error: {e}')
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/latest-detection', methods=['GET'])
-def latest_detection():
-    """Get the latest vehicle detection event (pre-allocation)"""
-    global latest_detection_event
-    try:
-        if latest_detection_event['plate']:
-            event = latest_detection_event.copy()
-            # Reset after sending
-            latest_detection_event = {'plate': None, 'timestamp': None}
-            return jsonify({
-                'success': True,
-                'plate': event['plate'],
-                'message': 'Vehicle detected, processing...'
-            }), 200
-        else:
-            return jsonify({'success': False, 'message': 'No recent detections'}), 200
-    except Exception as e:
-        logger.error(f'[LATEST_DETECTION] Error: {e}')
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/notify-detection', methods=['POST'])
-def notify_detection():
-    """Notify the API that a vehicle has been detected"""
-    global latest_detection_event
-    try:
-        plate = request.form.get('plate')
-        if not plate:
-            return jsonify({'success': False, 'error': 'No plate provided'}), 400
-            
-        logger.info(f'[NOTIFY] Vehicle detected: {plate}')
-        latest_detection_event = {
-            'plate': plate,
-            'timestamp': datetime.now().isoformat()
-        }
-        return jsonify({'success': True, 'message': 'Detection registered'}), 200
-    except Exception as e:
-        logger.error(f'[NOTIFY] Error: {e}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/latest-allocation', methods=['GET'])

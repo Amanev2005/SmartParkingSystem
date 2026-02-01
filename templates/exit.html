@@ -528,15 +528,7 @@
             <div class="qr-section">
                 <div class="qr-title">Scan QR Code to Pay</div>
                 <div class="qr-code" id="qrCodeContainer"></div>
-                <p class="scan-instruction">Scan this QR code with any UPI app to proceed</p>
-
-                <!-- PIN Display -->
-                <div class="pin-display">
-                    <div class="pin-label">Your Payment PIN:</div>
-                    <div class="pin-code" id="generatedPin">--</div>
-                    <p style="font-size: 12px; color: #666; margin-top: 8px;">Enter this PIN on the next screen to
-                        complete payment</p>
-                </div>
+                <p class="scan-instruction">Scan QR code to view Payment PIN</p>
             </div>
 
             <button class="btn-primary" onclick="proceedToPayment()">Enter Payment PIN</button>
@@ -624,7 +616,7 @@
 
             // Generate random PIN initially
             currentPin = Math.floor(1000 + Math.random() * 9000).toString();
-            document.getElementById('generatedPin').textContent = currentPin;
+            // Removed: document.getElementById('generatedPin').textContent = currentPin;
 
             // Check if URL params exist (manual test mode)
             const urlParams = new URLSearchParams(window.location.search);
@@ -686,7 +678,7 @@
 
             // Generate new PIN
             currentPin = Math.floor(1000 + Math.random() * 9000).toString();
-            document.getElementById('generatedPin').textContent = currentPin;
+            // Removed: document.getElementById('generatedPin').textContent = currentPin;
 
             // Parse Data
             const fee = data.fee || 85.00; // Fallback
@@ -709,10 +701,13 @@
             document.getElementById('successAmount').textContent = `₹${fee.toFixed(2)}`;
             document.getElementById('paymentTime').textContent = timeOut.toLocaleTimeString('en-US', timeOpt);
 
-            // Generate QR
+            // Generate QR - Changed from UPI to Text (PIN)
             const qrContainer = document.getElementById("qrCodeContainer");
             qrContainer.innerHTML = '';
-            const qrData = `upi://pay?pa=parking@upi&pn=SmartParking&am=${fee}&cu=INR&tn=Parking-${data.plate}-PIN:${currentPin}`;
+
+            // Format: PARKING_PIN|PIN|PLATE|AMOUNT|TXN_ID
+            // This allows the user to see the PIN when scanning
+            const qrData = `PARKING_PIN|${currentPin}|${data.plate}|₹${fee}|TXN${currentTxnId || '000'}`;
 
             new QRCode(qrContainer, {
                 text: qrData,
@@ -722,6 +717,10 @@
                 colorLight: "#ffffff",
                 correctLevel: QRCode.CorrectLevel.H
             });
+
+            // Hide on-screen PIN as requested
+            // Element removed from DOM
+            document.querySelector('.scan-instruction').textContent = 'Scan QR code to view Payment PIN';
         }
 
         function formatDuration(minutes) {

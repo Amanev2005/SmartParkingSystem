@@ -260,12 +260,6 @@ def _worker_process(q: queue.Queue, stop_event: threading.Event):
         plate = plate.upper().strip()
         logger.info(f"[DETECT] Plate: {plate}")
         
-        # Notify user screen immediately
-        try:
-            requests.post('http://localhost:5000/api/notify-detection', data={'plate': plate}, timeout=1)
-        except:
-            pass
-        
         # Confidence voting
         should_send, confirmed_plate = should_process_plate(plate)
         if not should_send:
