@@ -1,0 +1,15 @@
+# Web Server
+flask
+flask_sqlalchemy
+requests
+
+# Computer Vision & ML
+opencv-python
+ultralytics
+easyocr
+torch
+torchvision
+numpy
+pillow
+numpy
+requests

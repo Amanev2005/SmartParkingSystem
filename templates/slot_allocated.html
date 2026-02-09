@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot Allocated - Smart Parking</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .available-badge {
+            background: rgba(16, 185, 129, 0.1);
+            color: #34d399;
+            padding: 10px 24px;
+            border-radius: 50px;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 30px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .available-badge:hover {
+            transform: translateY(-2px);
+            background: rgba(16, 185, 129, 0.15);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #10b981;
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.5);
+                opacity: 0.6;
+            }
+        }
+
+        .checkmark {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 30px;
+            background: #4caf50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .checkmark::after {
+            content: '✓';
+            color: white;
+            font-size: 50px;
+            font-weight: bold;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 40px;
+        }
+
+        .info-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .info-label {
+            color: #999;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .slot-number {
+            font-size: 64px;
+            font-weight: 900;
+            color: #667eea;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .plate-info {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+        }
+
+        .time-info {
+            color: #999;
+            font-size: 14px;
+            margin-top: 15px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+            transform: translateY(-2px);
+        }
+
+        .instructions {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 30px;
+            text-align: left;
+        }
+
+        .instructions h3 {
+            color: #1976D2;
+            margin-bottom: 10px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .instructions ul {
+            list-style-position: inside;
+            color: #555;
+            line-height: 1.8;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+            padding-left: 0;
+            position: relative;
+        }
+
+        .instructions li::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            color: #6366f1;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 25px 15px;
+                border-radius: 15px;
+            }
+
+            .checkmark {
+                width: 60px;
+                height: 60px;
+                margin-bottom: 20px;
+            }
+
+            .checkmark::after {
+                font-size: 35px;
+            }
+
+            .slot-number {
+                font-size: clamp(40px, 15vw, 52px);
+                margin-bottom: 15px;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+
+            .subtitle {
+                font-size: 14px;
+                margin-bottom: 25px;
+            }
+
+            .info-section {
+                padding: 15px 10px;
+                margin-bottom: 20px;
+            }
+
+            .plate-info {
+                font-size: 15px;
+                padding: 10px;
+                letter-spacing: 1px;
+            }
+
+            .actions {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            button {
+                padding: 12px;
+                font-size: 14px;
+            }
+
+            .available-badge {
+                font-size: 11px;
+                padding: 5px 10px;
+            }
+
+            .available-count {
+                font-size: 15px;
+            }
+
+            .instructions {
+                padding: 15px;
+                font-size: 13px;
+            }
+
+            .instructions h3 {
+                font-size: 14px;
+            }
+        }
+
+        .processing-section {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px dashed rgba(255, 255, 255, 0.2);
+            padding: 40px;
+            border-radius: 24px;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            margin: 0 auto 24px;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .processing-text {
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .status-indicator {
+            margin-top: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: #64748b;
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 8px 16px;
+            border-radius: 50px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="available-badge">
+            <span class="status-dot"></span>
+            <span>Available Slots: <strong class="available-count" id="availableSlots">{{ free_slots }}</strong></span>
+        </div>
+
+        <div class="checkmark" id="checkmark"></div>
+
+        <div id="allocationSection">
+            <h1>Slot Allocated!</h1>
+            <p class="subtitle">Your parking slot has been reserved</p>
+
+            <div class="info-section">
+                <div class="info-label">Your Parking Slot</div>
+                <div class="slot-number" id="slotNumber">A-01</div>
+
+                <div class="plate-info" id="plateInfo">Loading...</div>
+                <div class="time-info" id="timeInfo"></div>
+            </div>
+
+            <div class="instructions">
+                <h3>📍 Instructions:</h3>
+                <ul>
+                    <li>Proceed to slot <strong id="slotNameInst">A-01</strong></li>
+                    <li>Park your vehicle in the designated area</li>
+                    <li>Keep your number plate clearly visible</li>
+                    <li>Visit the payment counter for payment details</li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="processingSection" class="processing-section" style="display: none;">
+            <div class="spinner"></div>
+            <p class="processing-text">Processing, please wait...</p>
+            <div id="processingPlate" class="processing-plate"></div>
+            <p style="margin-top: 15px; color: #666; font-size: 14px;">Allocating your parking slot</p>
+        </div>
+
+
+        <div class="actions" id="actionsSection">
+            <button class="btn-primary" onclick="goToDashboard()">Go to Dashboard</button>
+            <button class="btn-secondary" onclick="window.location.reload()">Clear & Wait</button>
+        </div>
+
+        <div class="status-indicator" id="statusIndicator">
+            <span class="status-dot"></span>
+            <span class="status-text">Waiting for vehicles...</span>
+        </div>
+    </div>
+
+    <script>
+        let lastUpdateTime = 0;
+        let updateInterval = 1000; // Poll every 1 second
+        let lastKnownSlot = null;
+
+        // Get slot and plate info from URL parameters (initial load)
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialSlot = urlParams.get('slot');
+        const initialPlate = urlParams.get('plate');
+
+        // Initialize with URL params if provided
+        if (initialSlot && initialPlate) {
+            updateDisplay(initialSlot, initialPlate);
+            lastKnownSlot = initialSlot;
+        }
+
+        /**
+         * Format slot number as P01, P02, etc.
+         */
+        function formatSlotName(slotNumber) {
+            if (typeof slotNumber === 'number') {
+                return `P${String(slotNumber).padStart(2, '0')}`;
+            }
+            // If already formatted or string
+            if (String(slotNumber).startsWith('P')) {
+                return slotNumber;
+            }
+            return `P${String(slotNumber).padStart(2, '0')}`;
+        }
+
+        /**
+         * Update the display with new slot and plate information
+         */
+        function updateDisplay(slotNumber, plate) {
+            const formattedSlot = formatSlotName(slotNumber);
+            const slotElement = document.getElementById('slotNumber');
+            const plateElement = document.getElementById('plateInfo');
+            const timeElement = document.getElementById('timeInfo');
+            const slotInstElement = document.getElementById('slotNameInst');
+            const checkmark = document.getElementById('checkmark');
+
+            // Add animation class
+            slotElement.classList.add('change-animation');
+            plateElement.classList.add('change-animation');
+
+            // Update content
+            slotElement.textContent = formattedSlot;
+            slotInstElement.textContent = formattedSlot;
+            plateElement.textContent = plate;
+
+            // Update time
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            timeElement.textContent = `Allocated at: ${timeStr}`;
+
+            // Animate checkmark
+            checkmark.style.animation = 'none';
+            setTimeout(() => {
+                checkmark.style.animation = 'scaleIn 0.5s ease-out';
+            }, 10);
+
+            // Remove animation class
+            setTimeout(() => {
+                slotElement.classList.remove('change-animation');
+                plateElement.classList.remove('change-animation');
+            }, 500);
+        }
+
+        /**
+         * Fetch the latest allocation from the API
+         */
+        async function fetchLatestAllocation() {
+            try {
+                const response = await fetch('/api/latest-allocation');
+                const data = await response.json();
+
+                if (data.success && data.slot_number && data.plate) {
+                    // Only update if it's a different slot
+                    if (data.slot_number !== lastKnownSlot) {
+                        updateDisplay(data.slot_number, data.plate);
+                        lastKnownSlot = data.slot_number;
+
+                        // Show allocation section, hide processing
+                        document.getElementById('allocationSection').style.display = 'block';
+                        document.getElementById('processingSection').style.display = 'none';
+                        document.getElementById('checkmark').style.display = 'flex';
+
+                        // Also refresh free slots immediately
+                        fetchHealthData();
+                    }
+                } else if (!lastKnownSlot) {
+                    // Still waiting for first allocation
+                    if (document.getElementById('processingSection').style.display === 'none') {
+                        updateStatusIndicator(false, 'Waiting for vehicles...');
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching allocation:', error);
+                updateStatusIndicator(false, 'Connection issue...', true);
+            }
+        }
+
+        /**
+         * Fetch the latest detection
+         */
+        async function fetchLatestDetection() {
+            try {
+                const response = await fetch('/api/latest-detection');
+                const data = await response.json();
+
+                if (data.success && data.plate) {
+                    // Show processing screen
+                    document.getElementById('allocationSection').style.display = 'none';
+                    updateStatusIndicator(false, `Processing ${data.plate}...`);
+                }
+            } catch (error) {
+                console.error('Error fetching detection:', error);
+            }
+        }
+
+        /**
+         * Fetch health data to update free slot count
+         */
+        async function fetchHealthData() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                if (data.status === 'healthy' && data.database) {
+                    document.getElementById('availableSlots').textContent = data.database.free;
+                }
+            } catch (error) {
+                console.error('Error fetching health data:', error);
+            }
+        }
+
+
+        /**
+         * Update the status indicator
+         */
+        function updateStatusIndicator(allocated, text, error = false) {
+            const indicator = document.getElementById('statusIndicator');
+            const dot = indicator.querySelector('.status-dot');
+            const statusText = indicator.querySelector('.status-text');
+
+            statusText.textContent = text;
+
+            if (error) {
+                dot.classList.add('error');
+            } else {
+                dot.classList.remove('error');
+            }
+        }
+
+        function goToDashboard() {
+            window.location.href = '/';
+        }
+
+        // Start polling for new allocations
+        setInterval(fetchLatestAllocation, updateInterval);
+
+
+        // Start polling for free slots
+        setInterval(fetchHealthData, updateInterval * 2);
+
+        // Start polling for detections
+        setInterval(fetchLatestDetection, updateInterval);
+
+        // Initial fetch
+        if (initialSlot && initialPlate) {
+            // Already have initial data, start polling
+            fetchLatestAllocation();
+            fetchHealthData();
+        } else {
+            // Hide everything initially if no data
+            document.getElementById('allocationSection').style.display = 'none';
+            document.getElementById('checkmark').style.display = 'none';
+
+            // Show waiting state
+            updateStatusIndicator(false, 'Waiting for vehicles...');
+            fetchLatestAllocation();
+            fetchHealthData();
+        }
+
+
+        // Also update if page regains focus
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                fetchLatestAllocation();
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Parking System - ANPR</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🅿️ Smart Parking System</h1>
+      <p class="subtitle">Professional Vehicle Management with ANPR & Real-time Analytics</p>
+    </header>
+
+    <nav class="main-nav">
+      <div class="nav-logo">🚗 SmartPark</div>
+      <ul class="nav-links">
+        <li><a href="#dashboard" class="nav-link active" data-page="dashboard">📊 Dashboard</a></li>
+        <li><a href="#details" class="nav-link" data-page="details">📋 Transactions</a></li>
+      </ul>
+    </nav>
+
+    <div id="dashboard-page" class="page-content active">
+      <!-- Stats Section -->
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-number" id="availableCount">0</div>
+          <div class="stat-label">Available Slots</div>
+        </div>
+        <div class="stat-card occupied">
+          <div class="stat-number" id="occupiedCount">0</div>
+          <div class="stat-label">Occupied Slots</div>
+        </div>
+        <div class="stat-card total">
+          <div class="stat-number" id="totalCount">0</div>
+          <div class="stat-label">Total Slots</div>
+        </div>
+      </div>
+
+      <!-- Entry/Exit Controls -->
+      <section id="controls">
+        <div class="control-group">
+          <h2>📥 Vehicle Entry</h2>
+          <form id="entryForm">
+            <input type="text" name="plate" placeholder="Enter License Plate" required>
+            <button type="submit">Register Entry</button>
+          </form>
+        </div>
+
+        <div class="control-group">
+          <h2>📤 Vehicle Exit</h2>
+          <form id="exitForm">
+            <input type="text" name="plate" placeholder="Enter License Plate" required>
+            <button type="submit">Register Exit</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Parking Layout -->
+      <section id="parking-lot">
+        <h2>🚗 Parking Layout</h2>
+        <div id="parkingLot"></div>
+      </section>
+    </div>
+
+    <!-- Details Page -->
+    <div id="details-page" class="page-content">
+      <section id="details-section">
+        <h2>📊 Transaction History</h2>
+        <div class="details-controls">
+          <button id="refreshDetailsBtn" class="refresh-btn">🔄 Refresh</button>
+        </div>
+        <div id="detailsContainer" class="details-table-container">
+          <p style="text-align: center; color: #94a3b8; padding: 40px;">Loading transaction details...</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- PIN Verification Modal -->
+  <div id="pinModal" class="pin-modal" style="display: none;">
+    <div class="pin-modal-content">
+      <div class="pin-modal-header">
+        <h2>🔐 Verify Payment PIN</h2>
+        <button class="pin-modal-close" onclick="closePinModal()">✕</button>
+      </div>
+      
+      <div class="pin-modal-body">
+        <p class="pin-instruction-text">Enter the 6-digit PIN from your payment slip</p>
+        
+        <div class="pin-input-group">
+          <input 
+            type="text" 
+            id="pinInput" 
+            class="pin-input" 
+            maxlength="6" 
+            placeholder="000000" 
+            inputmode="numeric"
+            autocomplete="off"
+          />
+        </div>
+        
+        <p class="pin-helper-text" id="pinHelperText"></p>
+      </div>
+      
+      <div class="pin-modal-footer">
+        <button class="pin-modal-btn cancel-btn" onclick="closePinModal()">Cancel</button>
+        <button class="pin-modal-btn verify-btn" onclick="verifyPin()">Verify</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
