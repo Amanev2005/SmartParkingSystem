@@ -39,7 +39,7 @@ PROCESS_EVERY_N = 2
 DISPLAY_UPDATE_EVERY = 2
 
 # IP Webcam configuration (Change to your IP camera address)
-IP_WEBCAM_URL = "http://10.85.107.37:8080/video"  # Update this IP address
+IP_WEBCAM_URL = "http://10.142.153.7:8080/video"  # Update this IP address
 LOCAL_CAMERA_ID = 0  # Fallback to local camera (0=default webcam)
 
 # Plate detection tracking

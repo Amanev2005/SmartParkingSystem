@@ -260,14 +260,12 @@ def exit_vehicle_internal(plate, txn):
         
         logger.info(f'[EXIT] Duration: {duration_minutes}m, Charge: ₹{charge}')
         
-        # DEFERRED RELEASE: Removed slot status update from here.
-        # Slot will now be released in the process_payment route.
-        # if txn.slot_id:
-        #     slot = Slot.query.get(txn.slot_id)
-        #     if slot:
-        #         slot.status = 'free'
-        #         slot.current_txn_id = None
-        #         logger.info(f'[EXIT] Slot {slot.number} released')
+        if txn.slot_id:
+            slot = Slot.query.get(txn.slot_id)
+            if slot:
+                slot.status = 'free'
+                slot.current_txn_id = None
+                logger.info(f'[EXIT] Slot {slot.number} released')
         
         db.session.commit()
         
@@ -588,13 +586,16 @@ def process_payment(txn_id):
         
         txn.payment_status = 'paid'
         
-        # RELEASE SLOT NOW on payment completion
+        # RELEASE SLOT NOW on payment completion - WITH SAFETY CHECK
+        # Only release if the slot is still tied to THIS transaction
         if txn.slot_id:
             slot = Slot.query.get(txn.slot_id)
-            if slot:
+            if slot and slot.current_txn_id == txn.id:
                 slot.status = 'free'
                 slot.current_txn_id = None
                 logger.info(f'[PAYMENT] Slot {slot.number} released for plate {txn.plate}')
+            else:
+                logger.info(f'[PAYMENT] Slot {slot.number if slot else "N/A"} already reassigned or released. Skipping release.')
         
         db.session.commit()
         
