@@ -567,7 +567,7 @@
             <div class="qr-section">
                 <div class="qr-title">Scan QR Code to Pay</div>
                 <div class="qr-code" id="qrCodeContainer"></div>
-                <p class="scan-instruction">Scan this QR code with any UPI app to proceed</p>
+                <p class="scan-instruction" id="scanInstruction">Scan to get your Secure PIN</p>
 
             </div>
 
@@ -742,7 +742,8 @@
             // Generate QR
             const qrContainer = document.getElementById("qrCodeContainer");
             qrContainer.innerHTML = '';
-            const qrData = `upi://pay?pa=parking@upi&pn=SmartParking&am=${fee}&cu=INR&tn=Parking-${data.plate}-PIN:${currentPin}`;
+            // Change from UPI to simple PIN message
+            const qrData = `PARKING-PIN:${currentPin}`;
 
             new QRCode(qrContainer, {
                 text: qrData,

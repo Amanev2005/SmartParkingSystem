@@ -260,14 +260,12 @@ def exit_vehicle_internal(plate, txn):
         
         logger.info(f'[EXIT] Duration: {duration_minutes}m, Charge: ₹{charge}')
         
-        # DEFERRED RELEASE: Removed slot status update from here.
-        # Slot will now be released in the process_payment route.
-        # if txn.slot_id:
-        #     slot = Slot.query.get(txn.slot_id)
-        #     if slot:
-        #         slot.status = 'free'
-        #         slot.current_txn_id = None
-        #         logger.info(f'[EXIT] Slot {slot.number} released')
+        if txn.slot_id:
+            slot = Slot.query.get(txn.slot_id)
+            if slot:
+                slot.status = 'free'
+                slot.current_txn_id = None
+                logger.info(f'[EXIT] Slot {slot.number} released')
         
         db.session.commit()
         
@@ -588,13 +586,16 @@ def process_payment(txn_id):
         
         txn.payment_status = 'paid'
         
-        # RELEASE SLOT NOW on payment completion
+        # RELEASE SLOT NOW on payment completion - WITH SAFETY CHECK
+        # Only release if the slot is still tied to THIS transaction
         if txn.slot_id:
             slot = Slot.query.get(txn.slot_id)
-            if slot:
+            if slot and slot.current_txn_id == txn.id:
                 slot.status = 'free'
                 slot.current_txn_id = None
                 logger.info(f'[PAYMENT] Slot {slot.number} released for plate {txn.plate}')
+            else:
+                logger.info(f'[PAYMENT] Slot {slot.number if slot else "N/A"} already reassigned or released. Skipping release.')
         
         db.session.commit()
         
@@ -705,7 +706,7 @@ if __name__ == '__main__':
         else:
             logger.info(f'[DB] ✓ Database already has {slot_count} slots')
     
-    logger.info('Starting Flask server on http://localhost:5000')
-    logger.info('entry page server on http://localhost:5000/allocation ')
-    logger.info('exit page server on http://localhost:5000/exit.html')
-    app.run(debug=True, host='localhost', port=5000)
+    logger.info('Starting Flask server on http://10.211.8.215:5000')
+    logger.info('entry page server on http://10.211.8.215:5000/allocation ')
+    logger.info('exit page server on http://10.211.8.215:5000/exit.html')
+    app.run(debug=True, host='0.0.0.0', port=5000)

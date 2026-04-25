@@ -21,7 +21,7 @@ if __name__ == '__main__':
     
     # Production mode - no reloader, no debugger
     app.run(
-        host='127.0.0.1',
+        host='0.0.0.0',
         port=5000,
         debug=False,
         use_reloader=False,
