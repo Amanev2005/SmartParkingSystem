@@ -39,7 +39,7 @@ def main():
     # Step 2: Initialize database
     print("\n[2/3] Initializing database...")
     if not run_command(
-        f"{sys.executable} init_parking_db.py",
+        f"{sys.executable} init_db.py",
         "Setting up parking slots"
     ):
         print("Failed to initialize database")
