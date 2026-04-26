@@ -38,7 +38,7 @@ def allocation():
     except Exception:
         free_slots = 0
         
-    return render_template('slot_allocated.html', 
+    return render_template('entry.html', 
                          slot=slot, 
                          plate=plate, 
                          txn_id=txn_id,
@@ -706,7 +706,7 @@ if __name__ == '__main__':
         else:
             logger.info(f'[DB] ✓ Database already has {slot_count} slots')
     
-    logger.info('Starting Flask server on http://10.211.8.215:5000')
+    logger.info('Admin page server on http://10.211.8.215:5000')
     logger.info('entry page server on http://10.211.8.215:5000/allocation ')
     logger.info('exit page server on http://10.211.8.215:5000/exit.html')
     app.run(debug=True, host='0.0.0.0', port=5000)

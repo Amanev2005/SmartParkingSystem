@@ -391,6 +391,105 @@
             margin-left: auto;
             margin-right: auto;
         }
+
+        /* Toll Gate Animation Styles */
+        .toll-gate {
+            width: 180px;
+            height: 120px;
+            margin: 0 auto 10px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            overflow: hidden;
+            display: none;
+            /* Hidden by default */
+        }
+
+        .gate-base {
+            width: 24px;
+            height: 60px;
+            background: linear-gradient(90deg, #333, #555);
+            border-radius: 4px 4px 0 0;
+            position: absolute;
+            bottom: 0;
+            right: 40px;
+            z-index: 10;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .gate-base::after {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 12px;
+            height: 12px;
+            background: #ff3333;
+            border-radius: 50%;
+            box-shadow: 0 0 5px #ff3333;
+            animation: lightBlink 1s infinite alternate;
+        }
+
+        @keyframes lightBlink {
+            from {
+                opacity: 0.5;
+            }
+
+            to {
+                opacity: 1;
+                box-shadow: 0 0 10px #ff3333;
+            }
+        }
+
+        .gate-bar {
+            width: 160px;
+            height: 14px;
+            background: repeating-linear-gradient(90deg,
+                    #cc0000,
+                    #cc0000 25px,
+                    #ffffff 25px,
+                    #ffffff 50px);
+            border: 1px solid #a00;
+            border-radius: 8px;
+            position: absolute;
+            bottom: 45px;
+            right: 50px;
+            transform-origin: 95% 50%;
+            transform: rotate(0deg);
+            z-index: 5;
+            box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Animation classes */
+        .gate-active .gate-bar {
+            animation: barrierCycle 8s ease-in-out forwards;
+        }
+
+        .gate-active .gate-base::after {
+            background: #4caf50;
+            box-shadow: 0 0 10px #4caf50;
+            animation: none;
+        }
+
+        @keyframes barrierCycle {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            15% {
+                transform: rotate(-85deg);
+            }
+
+            75% {
+                transform: rotate(-85deg);
+            }
+
+            100% {
+                transform: rotate(0deg);
+            }
+        }
     </style>
 </head>
 
@@ -399,6 +498,12 @@
         <div class="available-badge">
             <span class="status-dot"></span>
             <span>Available Slots: <strong class="available-count" id="availableSlots">{{ free_slots }}</strong></span>
+        </div>
+
+        <!-- Toll Gate Animation -->
+        <div class="toll-gate" id="tollGate">
+            <div class="gate-base"></div>
+            <div class="gate-bar"></div>
         </div>
 
         <div class="checkmark" id="checkmark"></div>
@@ -509,6 +614,13 @@
             setTimeout(() => {
                 checkmark.style.animation = 'scaleIn 0.5s ease-out';
             }, 10);
+
+            // Animate gate
+            const tollGate = document.getElementById('tollGate');
+            tollGate.style.display = 'flex';
+            tollGate.classList.remove('gate-active');
+            void tollGate.offsetWidth; // Trigger reflow
+            tollGate.classList.add('gate-active');
 
             // Remove animation class
             setTimeout(() => {
@@ -622,13 +734,13 @@
             fetchLatestAllocation();
             fetchHealthData();
         } else {
-            // Hide everything initially if no data
-            document.getElementById('allocationSection').style.display = 'none';
-            document.getElementById('checkmark').style.display = 'none';
+            // Show allocation section, hide processing
+            document.getElementById('allocationSection').style.display = 'block';
+            document.getElementById('processingSection').style.display = 'none';
+            document.getElementById('checkmark').style.display = 'flex';
+            document.getElementById('tollGate').style.display = 'flex';
 
-            // Show waiting state
-            updateStatusIndicator(false, 'Waiting for vehicles...');
-            fetchLatestAllocation();
+            // Also refresh free slots immediately
             fetchHealthData();
         }
 
